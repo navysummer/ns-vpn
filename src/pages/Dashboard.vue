@@ -7,6 +7,8 @@ import NetworkSettingsCard from "@/components/home/NetworkSettingsCard.vue";
 import TrafficStatsCard from "@/components/home/TrafficStatsCard.vue";
 import WebsiteTestCard from "@/components/home/WebsiteTestCard.vue";
 import IpInfoCard from "@/components/home/IpInfoCard.vue";
+import ClashInfoCard from "@/components/home/ClashInfoCard.vue";
+import SystemInfoCard from "@/components/home/SystemInfoCard.vue";
 
 const { show } = useToast();
 const loading = ref(true);
@@ -106,6 +108,11 @@ onMounted(() => {
           <WebsiteTestCard />
           <IpInfoCard />
         </div>
+
+        <div class="grid-info">
+          <ClashInfoCard />
+          <SystemInfoCard />
+        </div>
       </div>
     </template>
   </div>
@@ -151,6 +158,12 @@ onMounted(() => {
 }
 
 .grid-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.grid-info {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
@@ -241,7 +254,8 @@ onMounted(() => {
 @media (max-width: 768px) {
   .grid-top,
   .grid-middle,
-  .grid-bottom {
+  .grid-bottom,
+  .grid-info {
     grid-template-columns: 1fr;
   }
 }

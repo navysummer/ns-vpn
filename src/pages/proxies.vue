@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { RefreshCw, Check, Zap, Globe, Shield, Route, Heart, AlertTriangle } from "lucide-vue-next";
-import { delayQuality, formatDelay } from "@/utils/format";
-import BasePage from "@/components/BasePage.vue";
-import ProviderButton from "@/components/ProviderButton.vue";
-import EmptyState from "@/components/EmptyState.vue";
+import { ref, computed } from "vue";
+import { RefreshCw, Check, Zap, Globe, Shield, Route, ArrowUpDown, Eye, EyeOff, Filter, Link, RotateCcw } from "lucide-vue-next";
+import { delayQuality } from "@/utils/format";
 import { useToast } from "@/utils/toast";
+import EnhancedCard from "@/components/EnhancedCard.vue";
 
 const { show } = useToast();
 
 interface ProxyNode {
   name: string;
   type: string;
+  protocol: string[];
   delay: number;
   now: boolean;
 }
@@ -29,98 +28,71 @@ const groups = ref<ProxyGroup[]>([
   {
     name: "Proxy",
     type: "Selector",
-    now: "Auto",
-    all: [
-      { name: "Auto", type: "URLTest", delay: 45, now: false },
-      { name: "HK-01", type: "Shadowsocks", delay: 32, now: false },
-      { name: "HK-02", type: "Shadowsocks", delay: 0, now: false },
-      { name: "JP-01", type: "VMess", delay: 78, now: false },
-      { name: "JP-02", type: "VMess", delay: 120, now: false },
-      { name: "US-01", type: "Trojan", delay: 210, now: false },
-      { name: "US-02", type: "Trojan", delay: 0, now: false },
-      { name: "SG-01", type: "Shadowsocks", delay: 55, now: false },
-      { name: "Direct", type: "Direct", delay: 0, now: true },
-      { name: "Reject", type: "Reject", delay: 0, now: false },
-    ],
-  },
-  {
-    name: "Ai",
-    type: "Selector",
-    now: "Auto",
-    all: [
-      { name: "Auto", type: "URLTest", delay: 45, now: true },
-      { name: "HK-01", type: "Shadowsocks", delay: 32, now: false },
-      { name: "JP-01", type: "VMess", delay: 78, now: false },
-      { name: "US-01", type: "Trojan", delay: 210, now: false },
-    ],
-  },
-  {
-    name: "Media",
-    type: "Selector",
-    now: "Auto",
-    all: [
-      { name: "Auto", type: "URLTest", delay: 45, now: true },
-      { name: "HK-01", type: "Shadowsocks", delay: 32, now: false },
-      { name: "JP-01", type: "VMess", delay: 78, now: false },
-      { name: "SG-01", type: "Shadowsocks", delay: 55, now: false },
-    ],
-  },
-  {
-    name: "Auto",
-    type: "URLTest",
     now: "HK-01",
-    lastHealthCheck: Date.now() - 30000,
-    healthy: true,
     all: [
-      { name: "HK-01", type: "Shadowsocks", delay: 32, now: false },
-      { name: "HK-02", type: "Shadowsocks", delay: 0, now: false },
-      { name: "JP-01", type: "VMess", delay: 78, now: false },
-      { name: "US-01", type: "Trojan", delay: 210, now: false },
-      { name: "SG-01", type: "Shadowsocks", delay: 55, now: false },
+      { name: "DIRECT", type: "Direct", protocol: ["Direct", "UDP"], delay: 0, now: false },
+      { name: "REJECT", type: "Reject", protocol: ["Reject", "UDP"], delay: 0, now: false },
+      { name: "🇨🇦 加拿大 | CAN", type: "Hysteria2", protocol: ["Hysteria2", "UDP"], delay: 271, now: false },
+      { name: "🇨🇭 瑞士 | CHE", type: "Shadowsocks", protocol: ["Shadowsocks"], delay: 0, now: false },
+      { name: "🇨🇭 瑞士 | CHE 2", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇨🇴 哥伦比亚 | COL", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇨🇴 哥伦比亚 | COL 2", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 2", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 3", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 325, now: false },
+      { name: "🇩🇪 德国 | DEU 4", type: "Vmess", protocol: ["Vmess"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 5", type: "Vmess", protocol: ["Vmess"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 6", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 378, now: false },
+      { name: "🇩🇪 德国 | DEU 7", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 8", type: "Hysteria", protocol: ["Hysteria", "UDP"], delay: 268, now: true },
+      { name: "🇩🇪 德国 | DEU 9", type: "Hysteria2", protocol: ["Hysteria2", "UDP"], delay: 363, now: false },
+      { name: "🇩🇪 德国 | DEU 10", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 11", type: "Vless", protocol: ["Vless", "XUDP"], delay: 1006, now: false },
+      { name: "🇩🇪 德国 | DEU 12", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 13", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 334, now: false },
+      { name: "🇩🇪 德国 | DEU 14", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 15", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 340, now: false },
+      { name: "🇩🇪 德国 | DEU 16", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 240, now: false },
+      { name: "🇩🇪 德国 | DEU 17", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
+      { name: "🇩🇪 德国 | DEU 18", type: "Hysteria", protocol: ["Hysteria", "UDP"], delay: 327, now: false },
+      { name: "🇩🇪 德国 | DEU 19", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 317, now: false },
+      { name: "🇩🇪 德国 | DEU 20", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 259, now: false },
+      { name: "🇩🇪 德国 | DEU 21", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 358, now: false },
+      { name: "🇩🇪 德国 | DEU 22", type: "Vless", protocol: ["Vless", "UDP", "XUDP"], delay: 0, now: false },
     ],
   },
-]);
-
-const proxyProviders = ref([
-  { name: "airport-nodes", count: 45, loading: false },
-  { name: "free-nodes", count: 12, loading: false },
 ]);
 
 const selectedGroup = ref(groups.value[0].name);
 const testingAll = ref(false);
-const testingGroup = ref<string | null>(null);
 const proxyMode = ref<"rule" | "global" | "direct">("rule");
-const searchQuery = ref("");
+const showChain = ref(false);
+const sortBy = ref<"none" | "delay" | "name">("none");
+const sortAsc = ref(true);
 
-function selectGroup(name: string) { selectedGroup.value = name; }
+const currentGroup = computed(() => groups.value.find(g => g.name === selectedGroup.value)!);
 
-function selectNode(groupName: string, nodeName: string) {
-  const group = groups.value.find((g) => g.name === groupName);
-  if (group) {
-    group.now = nodeName;
-    group.all.forEach((n) => (n.now = n.name === nodeName));
+const sortedNodes = computed(() => {
+  let nodes = [...currentGroup.value.all];
+  if (sortBy.value === "delay") {
+    nodes.sort((a, b) => sortAsc.value ? a.delay - b.delay : b.delay - a.delay);
+  } else if (sortBy.value === "name") {
+    nodes.sort((a, b) => sortAsc.value ? a.name.localeCompare(b.name) : b.name.localeCompare(a.name));
   }
-}
+  return nodes;
+});
 
-function testGroupDelay(groupName: string) {
-  testingGroup.value = groupName;
-  const group = groups.value.find((g) => g.name === groupName);
-  if (group) {
-    group.all.forEach((n) => { n.delay = 0; });
-    group.all.forEach((n) => {
-      setTimeout(() => { n.delay = Math.floor(Math.random() * 300) + 20; }, Math.random() * 1500);
-    });
-    if (group.type === "URLTest") {
-      group.lastHealthCheck = Date.now();
-      group.healthy = true;
-    }
-  }
-  setTimeout(() => { testingGroup.value = null; }, 2000);
+function selectNode(nodeName: string) {
+  currentGroup.value.now = nodeName;
+  currentGroup.value.all.forEach(n => (n.now = n.name === nodeName));
 }
 
 function testAllDelay() {
   testingAll.value = true;
-  groups.value.forEach((g) => testGroupDelay(g.name));
+  currentGroup.value.all.forEach(n => { n.delay = 0; });
+  currentGroup.value.all.forEach(n => {
+    setTimeout(() => { n.delay = Math.floor(Math.random() * 500) + 20; }, Math.random() * 2000);
+  });
   setTimeout(() => { testingAll.value = false; }, 2500);
 }
 
@@ -129,159 +101,107 @@ function setProxyMode(mode: "rule" | "global" | "direct") {
   show(`已切换到${mode === "rule" ? "规则" : mode === "global" ? "全局" : "直连"}模式`, "info");
 }
 
-function filteredNodes(nodes: ProxyNode[]): ProxyNode[] {
-  if (!searchQuery.value) return nodes;
-  const q = searchQuery.value.toLowerCase();
-  return nodes.filter(n => n.name.toLowerCase().includes(q) || n.type.toLowerCase().includes(q));
-}
-
-function typeBadgeColor(type: ProxyGroup["type"]): string {
-  switch (type) {
-    case "Selector": return "#4f8ef7";
-    case "URLTest": return "#34c759";
-    case "Fallback": return "#ff9f0a";
-    case "LoadBalance": return "#bf5af2";
-    default: return "#98989e";
+function toggleSort(field: "delay" | "name") {
+  if (sortBy.value === field) {
+    sortAsc.value = !sortAsc.value;
+  } else {
+    sortBy.value = field;
+    sortAsc.value = true;
   }
 }
 
-function typeBadgeBg(type: ProxyGroup["type"]): string {
-  switch (type) {
-    case "Selector": return "rgba(79,142,247,0.12)";
-    case "URLTest": return "rgba(52,199,89,0.12)";
-    case "Fallback": return "rgba(255,159,10,0.12)";
-    case "LoadBalance": return "rgba(191,90,242,0.12)";
-    default: return "rgba(152,152,158,0.12)";
-  }
-}
-
-function refreshProvider(name: string) {
-  const p = proxyProviders.value.find(x => x.name === name);
-  if (p) {
-    p.loading = true;
-    setTimeout(() => { p.loading = false; }, 1500);
-  }
-}
-
-function healthyNodes(group: ProxyGroup): number {
-  return group.all.filter(n => n.delay > 0).length;
-}
-
-function lastCheckAgo(ts?: number): string {
-  if (!ts) return "未测试";
-  const diff = Math.floor((Date.now() - ts) / 1000);
-  if (diff < 60) return `${diff}秒前`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
-  return `${Math.floor(diff / 3600)}小时前`;
+function delayColor(delay: number): string {
+  if (delay === 0) return "var(--text-secondary)";
+  if (delay < 200) return "var(--green)";
+  if (delay < 400) return "var(--blue)";
+  if (delay < 800) return "var(--orange)";
+  return "var(--red)";
 }
 </script>
 
 <template>
-  <BasePage title="代理">
-    <template #actions>
-      <div class="flex items-center gap-2">
+  <div class="proxy-page">
+    <div class="proxy-header">
+      <h1 class="proxy-title">代理组</h1>
+      <div class="proxy-header-actions">
         <div class="mode-switcher">
-          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'rule' }" @click="setProxyMode('rule')"><Route :size="12" />规则</button>
-          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'global' }" @click="setProxyMode('global')"><Globe :size="12" />全局</button>
-          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'direct' }" @click="setProxyMode('direct')"><Shield :size="12" />直连</button>
+          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'rule' }" @click="setProxyMode('rule')">规则</button>
+          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'global' }" @click="setProxyMode('global')">全局</button>
+          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'direct' }" @click="setProxyMode('direct')">直连</button>
         </div>
-        <button class="btn-ghost text-xs" :disabled="testingAll" @click="testAllDelay">
-          <Zap :size="14" :class="{ spin: testingAll }" />
-          {{ testingAll ? "测试中..." : "延迟测试" }}
+        <button class="chain-btn" :class="{ 'chain-btn-active': showChain }" @click="showChain = !showChain">
+          <Link :size="14" />
+          链式代理
         </button>
       </div>
-    </template>
+    </div>
 
-    <div class="flex gap-4 flex-1 min-h-0">
-      <div class="proxy-sidebar">
-        <div class="proxy-search">
-          <input v-model="searchQuery" placeholder="搜索节点..." class="proxy-search-input" :style="{ color: 'var(--text-primary)' }" />
-        </div>
-        <div class="proxy-groups-list">
-          <button
-            v-for="group in groups"
-            :key="group.name"
-            class="proxy-group-btn"
-            :class="{ 'proxy-group-btn-active': selectedGroup === group.name }"
-            @click="selectGroup(group.name)"
-          >
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium truncate">{{ group.name }}</div>
-              <div class="flex items-center gap-1 mt-0.5">
-                <span class="type-badge" :style="{ backgroundColor: typeBadgeBg(group.type), color: typeBadgeColor(group.type) }">{{ group.type }}</span>
-                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ group.all.length }}</span>
-              </div>
-            </div>
-            <div class="flex flex-col items-end gap-1">
-              <span class="text-xs mono" :style="{ color: 'var(--accent)' }">{{ group.now }}</span>
-              <div v-if="group.type === 'URLTest'" class="flex items-center gap-1">
-                <span v-if="group.healthy" class="health-dot health-ok"></span>
-                <span v-else class="health-dot health-bad"></span>
-                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ lastCheckAgo(group.lastHealthCheck) }}</span>
-              </div>
-            </div>
-          </button>
-        </div>
-      </div>
+    <div class="proxy-toolbar">
+      <button class="tool-btn" title="刷新" @click="testAllDelay" :disabled="testingAll">
+        <RefreshCw :size="16" :class="{ spin: testingAll }" />
+      </button>
+      <button class="tool-btn" :class="{ 'tool-btn-active': sortBy === 'delay' }" title="按延迟排序" @click="toggleSort('delay')">
+        <ArrowUpDown :size="16" />
+      </button>
+      <button class="tool-btn" title="筛选">
+        <Filter :size="16" />
+      </button>
+      <button class="tool-btn" title="显示隐藏">
+        <Eye :size="16" />
+      </button>
+      <button class="tool-btn" title="取消选择">
+        <RotateCcw :size="16" />
+      </button>
+    </div>
 
-      <div class="proxy-nodes-panel flex-1">
-        <div class="flex items-center justify-between mb-3">
-          <div class="flex items-center gap-2">
-            <span class="text-sm font-medium">{{ selectedGroup }}</span>
-            <span class="type-badge" :style="{ backgroundColor: typeBadgeBg(groups.find(g => g.name === selectedGroup)!.type), color: typeBadgeColor(groups.find(g => g.name === selectedGroup)!.type) }">
-              {{ groups.find(g => g.name === selectedGroup)!.type }}
-            </span>
-            <span v-if="groups.find(g => g.name === selectedGroup)?.type === 'URLTest'" class="text-xs" :style="{ color: 'var(--text-secondary)' }">
-              {{ healthyNodes(groups.find(g => g.name === selectedGroup)!) }}/{{ groups.find(g => g.name === selectedGroup)!.all.length }} 可用
-            </span>
-          </div>
-          <button class="btn-ghost text-xs" :disabled="testingGroup === selectedGroup" @click="testGroupDelay(selectedGroup)">
-            <Zap :size="12" :class="{ spin: testingGroup === selectedGroup }" />
-            {{ testingGroup === selectedGroup ? "测试中..." : "测试" }}
-          </button>
+    <div class="proxy-nodes-grid">
+      <div
+        v-for="node in sortedNodes"
+        :key="node.name"
+        class="proxy-node-card"
+        :class="{ 'proxy-node-active': node.now }"
+        @click="selectNode(node.name)"
+      >
+        <div class="node-top">
+          <span class="node-name">{{ node.name }}</span>
+          <span v-if="node.delay > 0" class="node-delay" :style="{ color: delayColor(node.delay) }">
+            {{ node.delay }}
+          </span>
+          <span v-else-if="node.type === 'Direct' || node.type === 'Reject'" class="node-type-label">{{ node.type }}</span>
+          <span v-else class="node-error">Error</span>
         </div>
-
-        <div class="proxy-nodes-list">
-          <div
-            v-for="node in filteredNodes(groups.find(g => g.name === selectedGroup)?.all || [])"
-            :key="node.name"
-            class="proxy-node"
-            :class="{ 'proxy-node-active': node.now }"
-            @click="selectNode(selectedGroup, node.name)"
-          >
-            <div class="w-5 shrink-0"><Check v-if="node.now" :size="14" /></div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium truncate">{{ node.name }}</div>
-              <div class="text-xs" :style="{ color: node.now ? 'rgba(255,255,255,0.6)' : 'var(--text-secondary)' }">{{ node.type }}</div>
-            </div>
-            <div class="delay-badge" :class="{ 'delay-good': delayQuality(node.delay) === 'good', 'delay-medium': delayQuality(node.delay) === 'medium', 'delay-bad': delayQuality(node.delay) === 'bad', 'delay-none': delayQuality(node.delay) === 'none', 'delay-active': node.now }">
-              <Zap v-if="node.delay > 0" :size="10" />
-              {{ formatDelay(node.delay) }}
-            </div>
-          </div>
-          <EmptyState v-if="filteredNodes(groups.find(g => g.name === selectedGroup)?.all || []).length === 0" title="暂无节点" />
-        </div>
-      </div>
-
-      <div class="providers-panel">
-        <div class="text-xs font-medium mb-3" :style="{ color: 'var(--text-secondary)' }">代理提供者</div>
-        <div class="space-y-2">
-          <ProviderButton
-            v-for="provider in proxyProviders"
-            :key="provider.name"
-            :name="provider.name"
-            type="proxy"
-            :count="provider.count"
-            :loading="provider.loading"
-            @refresh="refreshProvider(provider.name)"
-          />
+        <div class="node-tags">
+          <span v-for="tag in node.protocol" :key="tag" class="node-tag">{{ tag }}</span>
         </div>
       </div>
     </div>
-  </BasePage>
+  </div>
 </template>
 
 <style scoped>
+.proxy-page {
+  max-width: 100%;
+}
+
+.proxy-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.proxy-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.proxy-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .mode-switcher {
   display: flex;
   gap: 2px;
@@ -294,7 +214,7 @@ function lastCheckAgo(ts?: number): string {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   border-radius: 6px;
   font-size: 12px;
   font-weight: 500;
@@ -307,118 +227,139 @@ function lastCheckAgo(ts?: number): string {
 .mode-btn:hover { color: var(--text-primary); }
 .mode-btn-active { background-color: var(--accent); color: #fff; }
 
-.proxy-sidebar {
-  width: 200px;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.proxy-search-input {
-  width: 100%;
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background-color: var(--bg-tertiary);
-  font-size: 12px;
-  outline: none;
-}
-.proxy-search-input:focus { border-color: var(--accent); }
-
-.proxy-groups-list {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  overflow-y: auto;
-  flex: 1;
-}
-
-.proxy-group-btn {
+.chain-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.chain-btn:hover { border-color: var(--accent); color: var(--text-primary); }
+.chain-btn-active { background-color: rgba(79,142,247,0.1); border-color: var(--accent); color: var(--accent); }
+
+.proxy-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+
+.tool-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
   border: none;
   cursor: pointer;
   transition: all 150ms ease;
   background: transparent;
-  text-align: left;
-  width: 100%;
+  color: var(--text-secondary);
 }
-.proxy-group-btn:hover { background-color: var(--bg-hover); }
-.proxy-group-btn-active { background-color: rgba(79,142,247,0.1); border: 1px solid rgba(79,142,247,0.3); }
+.tool-btn:hover { background-color: var(--bg-hover); color: var(--text-primary); }
+.tool-btn-active { background-color: rgba(79,142,247,0.1); color: var(--accent); }
 
-.proxy-nodes-panel {
+.proxy-nodes-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.proxy-node-card {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.proxy-node-card:hover {
+  border-color: var(--accent);
+  background-color: var(--bg-hover);
 }
 
-.proxy-nodes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  overflow-y: auto;
-  flex: 1;
-  max-height: calc(100vh - 240px);
+.proxy-node-active {
+  border-color: var(--accent) !important;
+  background-color: rgba(79,142,247,0.1) !important;
 }
 
-.proxy-node {
+.node-top {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 150ms ease;
-  color: var(--text-primary);
+  gap: 8px;
 }
-.proxy-node:hover { background-color: var(--bg-hover); }
-.proxy-node-active { background-color: var(--accent) !important; color: #fff !important; }
 
-.type-badge {
+.node-name {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-delay {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.node-error {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+.node-type-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.node-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.node-tag {
   display: inline-flex;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 10px;
-  font-weight: 600;
-}
-
-.delay-badge {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-family: "SF Mono", "Fira Code", monospace;
+  font-weight: 500;
   background-color: var(--bg-tertiary);
-  min-width: 50px;
-  justify-content: center;
+  color: var(--text-secondary);
 }
-.delay-good { color: var(--green); }
-.delay-medium { color: var(--orange); }
-.delay-bad { color: var(--red); }
-.delay-none { color: var(--text-secondary); }
-.delay-active { background-color: rgba(255,255,255,0.15); }
 
-.health-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+.spin {
+  animation: spin 1s linear infinite;
 }
-.health-ok { background-color: var(--green); }
-.health-bad { background-color: var(--red); }
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
-.providers-panel {
-  width: 200px;
-  min-width: 200px;
-  padding: 16px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background-color: var(--card-bg);
-  height: fit-content;
+@media (max-width: 1024px) {
+  .proxy-nodes-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .proxy-nodes-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
