@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { Search } from "lucide-vue-next";
+import BasePage from "@/components/BasePage.vue";
 
 interface RuleEntry {
   type: string;
@@ -42,11 +43,7 @@ const filteredRules = computed(() => {
     }
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase();
-      return (
-        r.payload.toLowerCase().includes(q) ||
-        r.type.toLowerCase().includes(q) ||
-        r.proxy.toLowerCase().includes(q)
-      );
+      return r.payload.toLowerCase().includes(q) || r.type.toLowerCase().includes(q) || r.proxy.toLowerCase().includes(q);
     }
     return true;
   });
@@ -90,103 +87,41 @@ function typeBg(type: string): string {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">规则</h1>
+  <BasePage title="规则">
+    <template #actions>
       <span class="text-sm" :style="{ color: 'var(--text-secondary)' }">
-        共 {{ filteredRules.length }} / {{ rules.length }} 条规则
+        {{ filteredRules.length }} / {{ rules.length }} 条
       </span>
-    </div>
+    </template>
 
-    <div class="flex items-center gap-3">
-      <div
-        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs"
-        :style="{ backgroundColor: 'var(--bg-tertiary)' }"
-      >
+    <div class="flex items-center gap-3 mb-4">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
         <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
-        <input
-          v-model="searchQuery"
-          placeholder="搜索规则..."
-          class="bg-transparent outline-none flex-1 text-sm"
-          :style="{ color: 'var(--text-primary)' }"
-        />
+        <input v-model="searchQuery" placeholder="搜索规则..." class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
       </div>
       <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-        <button
-          v-for="opt in ([{ label: '全部', value: 'all' }, { label: '域名', value: 'DOMAIN' }, { label: 'IP', value: 'IP-CIDR' }, { label: 'GEOIP', value: 'GEOIP' }, { label: 'MATCH', value: 'MATCH' }] as const)"
-          :key="opt.value"
-          class="tab-btn"
-          :class="filterType === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'"
-          @click="filterType = opt.value"
-        >
+        <button v-for="opt in ([{ label: '全部', value: 'all' }, { label: '域名', value: 'DOMAIN' }, { label: 'IP', value: 'IP-CIDR' }, { label: 'GEOIP', value: 'GEOIP' }, { label: 'MATCH', value: 'MATCH' }] as const)" :key="opt.value" class="tab-btn" :class="filterType === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="filterType = opt.value">
           {{ opt.label }}
         </button>
       </div>
     </div>
 
-    <div class="rounded-xl overflow-hidden border" :style="{ borderColor: 'var(--border)' }">
-      <div
-        class="grid grid-cols-4 gap-2 px-4 py-2.5 text-xs font-medium"
-        :style="{
-          backgroundColor: 'var(--bg-secondary)',
-          color: 'var(--text-secondary)',
-          borderBottom: '1px solid var(--border)',
-        }"
-      >
+    <div class="rounded-xl overflow-hidden border flex-1" :style="{ borderColor: 'var(--border)' }">
+      <div class="grid grid-cols-4 gap-2 px-4 py-2.5 text-xs font-medium" :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }">
         <div>类型</div>
         <div>内容</div>
         <div>行为</div>
         <div>代理</div>
       </div>
-
-      <div
-        class="divide-y max-h-[calc(100vh-300px)] overflow-y-auto"
-        :style="{ borderColor: 'var(--border)' }"
-      >
-        <div
-          v-for="(rule, i) in filteredRules"
-          :key="i"
-          class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center row-hover"
-          :style="{ borderColor: 'var(--border)' }"
-        >
-          <div>
-            <span
-              class="tag"
-              :style="{
-                backgroundColor: typeBg(rule.type),
-                color: typeColor(rule.type),
-              }"
-            >
-              {{ rule.type }}
-            </span>
-          </div>
-          <div class="font-mono text-xs truncate" :style="{ color: 'var(--text-primary)' }">
-            {{ rule.payload }}
-          </div>
-          <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">
-            {{ rule.behavior }}
-          </div>
-          <div>
-            <span
-              class="tag"
-              :style="{
-                backgroundColor: proxyBg(rule.proxy),
-                color: proxyColor(rule.proxy),
-              }"
-            >
-              {{ rule.proxy }}
-            </span>
-          </div>
+      <div class="divide-y max-h-[calc(100vh-300px)] overflow-y-auto" :style="{ borderColor: 'var(--border)' }">
+        <div v-for="(rule, i) in filteredRules" :key="i" class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center row-hover" :style="{ borderColor: 'var(--border)' }">
+          <div><span class="tag" :style="{ backgroundColor: typeBg(rule.type), color: typeColor(rule.type) }">{{ rule.type }}</span></div>
+          <div class="font-mono text-xs truncate" :style="{ color: 'var(--text-primary)' }">{{ rule.payload }}</div>
+          <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ rule.behavior }}</div>
+          <div><span class="tag" :style="{ backgroundColor: proxyBg(rule.proxy), color: proxyColor(rule.proxy) }">{{ rule.proxy }}</span></div>
         </div>
-
-        <div
-          v-if="filteredRules.length === 0"
-          class="px-4 py-12 text-center text-sm"
-          :style="{ color: 'var(--text-secondary)' }"
-        >
-          暂无匹配规则
-        </div>
+        <div v-if="filteredRules.length === 0" class="px-4 py-12 text-center text-sm" :style="{ color: 'var(--text-secondary)' }">暂无匹配规则</div>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>

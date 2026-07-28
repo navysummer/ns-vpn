@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { Plus, Download, MoreHorizontal, Check, FileJson, RefreshCw, Globe, GitMerge, ScrollText, Trash2, Edit3 } from "lucide-vue-next";
+import { Plus, Download, Check, FileJson, RefreshCw, Globe, GitMerge, ScrollText, Trash2, Upload } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import BasePage from "@/components/BasePage.vue";
 
 const { show } = useToast();
 
@@ -28,6 +29,7 @@ const deleteTarget = ref<string | null>(null);
 const newProfileName = ref("");
 const newProfileUrl = ref("");
 const newProfileType = ref<"local" | "remote">("local");
+const selectedProfiles = ref<Set<string>>(new Set());
 
 function activateProfile(name: string) {
   profiles.value.forEach((p) => (p.active = p.name === name));
@@ -54,6 +56,20 @@ function doDelete() {
   }
   showDeleteDialog.value = false;
   deleteTarget.value = null;
+}
+
+function toggleSelect(name: string) {
+  if (selectedProfiles.value.has(name)) {
+    selectedProfiles.value.delete(name);
+  } else {
+    selectedProfiles.value.add(name);
+  }
+}
+
+function deleteSelected() {
+  profiles.value = profiles.value.filter(p => !selectedProfiles.value.has(p.name));
+  show(`已删除 ${selectedProfiles.value.size} 个配置`, "success");
+  selectedProfiles.value.clear();
 }
 
 function addProfile() {
@@ -107,12 +123,15 @@ function typeColor(type: string): string {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">配置</h1>
+  <BasePage title="配置">
+    <template #actions>
       <div class="flex items-center gap-2">
+        <button v-if="selectedProfiles.size > 0" class="btn-ghost text-xs" :style="{ color: 'var(--red)' }" @click="deleteSelected">
+          <Trash2 :size="12" />
+          删除 ({{ selectedProfiles.size }})
+        </button>
         <button class="btn-ghost text-xs" @click="importProfile">
-          <Download :size="14" />
+          <Upload :size="14" />
           导入
         </button>
         <button class="btn-primary text-xs" @click="showAddDialog = true">
@@ -120,9 +139,9 @@ function typeColor(type: string): string {
           添加
         </button>
       </div>
-    </div>
+    </template>
 
-    <div class="space-y-2">
+    <div class="space-y-2 flex-1">
       <div
         v-for="profile in profiles"
         :key="profile.name"
@@ -130,32 +149,26 @@ function typeColor(type: string): string {
         :class="{ 'profile-card-active': profile.active }"
         @click="activateProfile(profile.name)"
       >
-        <div class="w-5 shrink-0">
-          <Check v-if="profile.active" :size="16" style="color: var(--green)" />
+        <div class="w-5 shrink-0" @click.stop>
+          <input
+            type="checkbox"
+            :checked="selectedProfiles.has(profile.name)"
+            class="profile-checkbox"
+            @change="toggleSelect(profile.name)"
+          />
         </div>
 
         <div
           class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
-          :style="{
-            backgroundColor: profile.active ? 'var(--accent)' : 'var(--bg-tertiary)',
-          }"
+          :style="{ backgroundColor: profile.active ? 'var(--accent)' : 'var(--bg-tertiary)' }"
         >
-          <component
-            :is="typeIcon(profile.type)"
-            :size="18"
-            :style="{ color: profile.active ? '#fff' : typeColor(profile.type) }"
-          />
+          <component :is="typeIcon(profile.type)" :size="18" :style="{ color: profile.active ? '#fff' : typeColor(profile.type) }" />
         </div>
 
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium truncate">{{ profile.name }}</div>
           <div class="flex items-center gap-2 text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">
-            <span
-              class="type-tag"
-              :style="{ color: typeColor(profile.type), backgroundColor: typeColor(profile.type).replace(')', ',0.12)').replace('var(', 'rgba(') }"
-            >
-              {{ typeLabel(profile.type) }}
-            </span>
+            <span class="type-tag" :style="{ color: typeColor(profile.type) }">{{ typeLabel(profile.type) }}</span>
             <span>·</span>
             <span>{{ profile.updated }}</span>
             <span v-if="profile.nodes > 0">·</span>
@@ -164,11 +177,8 @@ function typeColor(type: string): string {
         </div>
 
         <div class="flex items-center gap-1 shrink-0">
-          <button
-            v-if="profile.type === 'remote'"
-            class="btn-ghost text-xs"
-            @click.stop="updateProfile(profile.name)"
-          >
+          <Check v-if="profile.active" :size="16" style="color: var(--green)" />
+          <button v-if="profile.type === 'remote'" class="btn-ghost text-xs" @click.stop="updateProfile(profile.name)">
             <RefreshCw :size="12" />
             更新
           </button>
@@ -191,35 +201,18 @@ function typeColor(type: string): string {
 
     <Teleport to="body">
       <Transition name="page">
-        <div
-          v-if="showAddDialog"
-          class="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
-          @click="showAddDialog = false"
-        >
-          <div
-            class="card w-full max-w-md mx-4 space-y-4"
-            :style="{ backgroundColor: 'var(--bg-secondary)' }"
-            @click.stop
-          >
+        <div v-if="showAddDialog" class="fixed inset-0 flex items-center justify-center bg-black/50 z-50" @click="showAddDialog = false">
+          <div class="card w-full max-w-md mx-4 space-y-4" :style="{ backgroundColor: 'var(--bg-secondary)' }" @click.stop>
             <h3 class="text-base font-medium">添加配置</h3>
-
             <div class="space-y-3">
               <div>
                 <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">类型</label>
                 <div class="flex gap-2">
-                  <button
-                    class="tab-btn flex-1"
-                    :class="newProfileType === 'local' ? 'tab-btn-active' : 'tab-btn-inactive'"
-                    @click="newProfileType = 'local'"
-                  >
+                  <button class="tab-btn flex-1" :class="newProfileType === 'local' ? 'tab-btn-active' : 'tab-btn-inactive'" @click="newProfileType = 'local'">
                     <FileJson :size="14" />
                     本地
                   </button>
-                  <button
-                    class="tab-btn flex-1"
-                    :class="newProfileType === 'remote' ? 'tab-btn-active' : 'tab-btn-inactive'"
-                    @click="newProfileType = 'remote'"
-                  >
+                  <button class="tab-btn flex-1" :class="newProfileType === 'remote' ? 'tab-btn-active' : 'tab-btn-inactive'" @click="newProfileType = 'remote'">
                     <Globe :size="14" />
                     远程
                   </button>
@@ -227,32 +220,13 @@ function typeColor(type: string): string {
               </div>
               <div>
                 <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">名称</label>
-                <input
-                  v-model="newProfileName"
-                  placeholder="配置名称"
-                  class="w-full rounded-lg px-3 py-2 text-sm outline-none border"
-                  :style="{
-                    backgroundColor: 'var(--bg-tertiary)',
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border)',
-                  }"
-                />
+                <input v-model="newProfileName" placeholder="配置名称" class="w-full rounded-lg px-3 py-2 text-sm outline-none border" :style="{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }" />
               </div>
               <div v-if="newProfileType === 'remote'">
                 <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">订阅 URL</label>
-                <input
-                  v-model="newProfileUrl"
-                  placeholder="https://example.com/sub"
-                  class="w-full rounded-lg px-3 py-2 text-sm outline-none border"
-                  :style="{
-                    backgroundColor: 'var(--bg-tertiary)',
-                    color: 'var(--text-primary)',
-                    borderColor: 'var(--border)',
-                  }"
-                />
+                <input v-model="newProfileUrl" placeholder="https://example.com/sub" class="w-full rounded-lg px-3 py-2 text-sm outline-none border" :style="{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }" />
               </div>
             </div>
-
             <div class="flex justify-end gap-2">
               <button class="btn-ghost text-xs" @click="showAddDialog = false">取消</button>
               <button class="btn-primary text-xs" @click="addProfile">添加</button>
@@ -261,7 +235,7 @@ function typeColor(type: string): string {
         </div>
       </Transition>
     </Teleport>
-  </div>
+  </BasePage>
 </template>
 
 <style scoped>
@@ -269,18 +243,21 @@ function typeColor(type: string): string {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 16px;
+  padding: 12px 16px;
   border-radius: 12px;
   border: 1px solid var(--border);
   background-color: var(--card-bg);
   cursor: pointer;
   transition: border-color 150ms ease;
 }
-.profile-card:hover {
-  border-color: var(--accent);
-}
-.profile-card-active {
-  border-color: var(--accent);
+.profile-card:hover { border-color: var(--accent); }
+.profile-card-active { border-color: var(--accent); }
+
+.profile-checkbox {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 .type-tag {

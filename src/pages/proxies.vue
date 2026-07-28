@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { RefreshCw, Check, Zap } from "lucide-vue-next";
+import { RefreshCw, Check, Zap, Globe, Shield, Route } from "lucide-vue-next";
 import { delayQuality, formatDelay } from "@/utils/format";
+import BasePage from "@/components/BasePage.vue";
+import { useToast } from "@/utils/toast";
+
+const { show } = useToast();
 
 interface ProxyNode {
   name: string;
@@ -74,7 +78,8 @@ const groups = ref<ProxyGroup[]>([
 const selectedGroup = ref(groups.value[0].name);
 const testingAll = ref(false);
 const testingGroup = ref<string | null>(null);
-const expandedInfo = ref<string | null>(null);
+const proxyMode = ref<"rule" | "global" | "direct">("rule");
+const searchQuery = ref("");
 
 function selectGroup(name: string) {
   selectedGroup.value = name;
@@ -92,13 +97,9 @@ function testGroupDelay(groupName: string) {
   testingGroup.value = groupName;
   const group = groups.value.find((g) => g.name === groupName);
   if (group) {
+    group.all.forEach((n) => { n.delay = 0; });
     group.all.forEach((n) => {
-      n.delay = 0;
-    });
-    group.all.forEach((n) => {
-      setTimeout(() => {
-        n.delay = Math.floor(Math.random() * 300) + 20;
-      }, Math.random() * 1500);
+      setTimeout(() => { n.delay = Math.floor(Math.random() * 300) + 20; }, Math.random() * 1500);
     });
   }
   setTimeout(() => { testingGroup.value = null; }, 2000);
@@ -110,8 +111,15 @@ function testAllDelay() {
   setTimeout(() => { testingAll.value = false; }, 2500);
 }
 
-function toggleGroupInfo(name: string) {
-  expandedInfo.value = expandedInfo.value === name ? null : name;
+function setProxyMode(mode: "rule" | "global" | "direct") {
+  proxyMode.value = mode;
+  show(`已切换到${mode === "rule" ? "规则" : mode === "global" ? "全局" : "直连"}模式`, "info");
+}
+
+function filteredNodes(nodes: ProxyNode[]): ProxyNode[] {
+  if (!searchQuery.value) return nodes;
+  const q = searchQuery.value.toLowerCase();
+  return nodes.filter(n => n.name.toLowerCase().includes(q) || n.type.toLowerCase().includes(q));
 }
 
 function typeBadgeColor(type: ProxyGroup["type"]): string {
@@ -137,127 +145,245 @@ function typeBadgeBg(type: ProxyGroup["type"]): string {
 function nodeTypeColor(type: string): string {
   if (type === "Direct") return "var(--green)";
   if (type === "Reject") return "var(--red)";
-  if (type === "URLTest") return "var(--text-secondary)";
   return "var(--text-secondary)";
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">代理</h1>
-      <button
-        class="btn-ghost text-sm"
-        :disabled="testingAll"
-        @click="testAllDelay"
-      >
-        <Zap :size="14" :class="{ spin: testingAll }" />
-        {{ testingAll ? "测试中..." : "延迟测试" }}
-      </button>
-    </div>
-
-    <div class="flex gap-1 p-1 rounded-lg overflow-x-auto" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-      <button
-        v-for="group in groups"
-        :key="group.name"
-        class="tab-btn"
-        :class="selectedGroup === group.name ? 'tab-btn-active' : 'tab-btn-inactive'"
-        @click="selectGroup(group.name)"
-      >
-        {{ group.name }}
-        <span
-          class="type-badge"
-          :style="{ backgroundColor: typeBadgeBg(group.type), color: typeBadgeColor(group.type) }"
-        >
-          {{ group.type }}
-        </span>
-        <span class="ml-1 opacity-60">({{ group.all.length }})</span>
-      </button>
-    </div>
-
-    <div
-      v-for="group in groups"
-      v-show="group.name === selectedGroup"
-      :key="group.name"
-      class="space-y-2"
-    >
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="text-sm font-medium">{{ group.name }}</span>
-          <span
-            class="type-badge"
-            :style="{ backgroundColor: typeBadgeBg(group.type), color: typeBadgeColor(group.type) }"
+  <BasePage title="代理">
+    <template #actions>
+      <div class="flex items-center gap-2">
+        <div class="mode-switcher">
+          <button
+            class="mode-btn"
+            :class="{ 'mode-btn-active': proxyMode === 'rule' }"
+            @click="setProxyMode('rule')"
           >
-            {{ group.type }}
-          </span>
-          <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">
-            当前: {{ group.now }}
-          </span>
+            <Route :size="12" />
+            规则
+          </button>
+          <button
+            class="mode-btn"
+            :class="{ 'mode-btn-active': proxyMode === 'global' }"
+            @click="setProxyMode('global')"
+          >
+            <Globe :size="12" />
+            全局
+          </button>
+          <button
+            class="mode-btn"
+            :class="{ 'mode-btn-active': proxyMode === 'direct' }"
+            @click="setProxyMode('direct')"
+          >
+            <Shield :size="12" />
+            直连
+          </button>
         </div>
-        <button
-          class="btn-ghost text-xs"
-          :disabled="testingGroup === group.name"
-          @click="testGroupDelay(group.name)"
-        >
-          <Zap :size="12" :class="{ spin: testingGroup === group.name }" />
-          {{ testingGroup === group.name ? "测试中..." : "测试" }}
+        <button class="btn-ghost text-xs" :disabled="testingAll" @click="testAllDelay">
+          <Zap :size="14" :class="{ spin: testingAll }" />
+          {{ testingAll ? "测试中..." : "延迟测试" }}
         </button>
       </div>
+    </template>
 
-      <div class="space-y-0.5">
-        <div
-          v-for="node in group.all"
-          :key="node.name"
-          class="proxy-node"
-          :class="{ 'proxy-node-active': node.now }"
-          @click="selectNode(group.name, node.name)"
-        >
-          <div class="w-5 shrink-0">
-            <Check v-if="node.now" :size="14" />
-          </div>
-
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium truncate">{{ node.name }}</span>
-              <span
-                class="node-type-tag"
-                :style="{ color: nodeTypeColor(node.type) }"
-              >
-                {{ node.type }}
-              </span>
-            </div>
-          </div>
-
-          <div
-            class="delay-badge"
-            :class="{
-              'delay-good': delayQuality(node.delay) === 'good',
-              'delay-medium': delayQuality(node.delay) === 'medium',
-              'delay-bad': delayQuality(node.delay) === 'bad',
-              'delay-none': delayQuality(node.delay) === 'none',
-              'delay-active': node.now,
-            }"
+    <div class="flex gap-4 flex-1 min-h-0">
+      <div class="proxy-sidebar">
+        <div class="proxy-search">
+          <input
+            v-model="searchQuery"
+            placeholder="搜索节点..."
+            class="proxy-search-input"
+            :style="{ color: 'var(--text-primary)' }"
+          />
+        </div>
+        <div class="proxy-groups-list">
+          <button
+            v-for="group in groups"
+            :key="group.name"
+            class="proxy-group-btn"
+            :class="{ 'proxy-group-btn-active': selectedGroup === group.name }"
+            @click="selectGroup(group.name)"
           >
-            <Zap v-if="node.delay > 0" :size="10" />
-            {{ formatDelay(node.delay) }}
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">{{ group.name }}</div>
+              <div class="flex items-center gap-1 mt-0.5">
+                <span
+                  class="type-badge"
+                  :style="{ backgroundColor: typeBadgeBg(group.type), color: typeBadgeColor(group.type) }"
+                >
+                  {{ group.type }}
+                </span>
+                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ group.all.length }} 节点</span>
+              </div>
+            </div>
+            <span class="text-xs mono" :style="{ color: 'var(--accent)' }">{{ group.now }}</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="proxy-nodes-panel flex-1">
+        <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium">{{ selectedGroup }}</span>
+            <span
+              class="type-badge"
+              :style="{ backgroundColor: typeBadgeBg(groups.find(g => g.name === selectedGroup)!.type), color: typeBadgeColor(groups.find(g => g.name === selectedGroup)!.type) }"
+            >
+              {{ groups.find(g => g.name === selectedGroup)!.type }}
+            </span>
+          </div>
+          <button
+            class="btn-ghost text-xs"
+            :disabled="testingGroup === selectedGroup"
+            @click="testGroupDelay(selectedGroup)"
+          >
+            <Zap :size="12" :class="{ spin: testingGroup === selectedGroup }" />
+            {{ testingGroup === selectedGroup ? "测试中..." : "测试" }}
+          </button>
+        </div>
+
+        <div class="proxy-nodes-list">
+          <div
+            v-for="node in filteredNodes(groups.find(g => g.name === selectedGroup)?.all || [])"
+            :key="node.name"
+            class="proxy-node"
+            :class="{ 'proxy-node-active': node.now }"
+            @click="selectNode(selectedGroup, node.name)"
+          >
+            <div class="w-5 shrink-0">
+              <Check v-if="node.now" :size="14" />
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium truncate">{{ node.name }}</div>
+              <div class="text-xs" :style="{ color: node.now ? 'rgba(255,255,255,0.6)' : 'var(--text-secondary)' }">
+                {{ node.type }}
+              </div>
+            </div>
+            <div
+              class="delay-badge"
+              :class="{
+                'delay-good': delayQuality(node.delay) === 'good',
+                'delay-medium': delayQuality(node.delay) === 'medium',
+                'delay-bad': delayQuality(node.delay) === 'bad',
+                'delay-none': delayQuality(node.delay) === 'none',
+                'delay-active': node.now,
+              }"
+            >
+              <Zap v-if="node.delay > 0" :size="10" />
+              {{ formatDelay(node.delay) }}
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
+  </BasePage>
 </template>
 
 <style scoped>
+.mode-switcher {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background-color: var(--bg-tertiary);
+}
+
+.mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.mode-btn:hover {
+  color: var(--text-primary);
+}
+.mode-btn-active {
+  background-color: var(--accent);
+  color: #fff;
+}
+
+.proxy-sidebar {
+  width: 200px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.proxy-search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-tertiary);
+  font-size: 12px;
+  outline: none;
+}
+.proxy-search-input:focus {
+  border-color: var(--accent);
+}
+
+.proxy-groups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.proxy-group-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+}
+.proxy-group-btn:hover {
+  background-color: var(--bg-hover);
+}
+.proxy-group-btn-active {
+  background-color: rgba(79,142,247,0.1);
+  border: 1px solid rgba(79,142,247,0.3);
+}
+
+.proxy-nodes-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.proxy-nodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  overflow-y: auto;
+  flex: 1;
+  max-height: calc(100vh - 240px);
+}
+
 .proxy-node {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 16px;
+  padding: 8px 12px;
   border-radius: 8px;
   cursor: pointer;
-  transition: background-color 150ms ease, color 150ms ease;
+  transition: background-color 150ms ease;
   color: var(--text-primary);
-  background: transparent;
 }
 .proxy-node:hover {
   background-color: var(--bg-hover);
@@ -269,20 +395,10 @@ function nodeTypeColor(type: string): string {
 
 .type-badge {
   display: inline-flex;
-  align-items: center;
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 10px;
   font-weight: 600;
-  line-height: 1.4;
-}
-
-.node-type-tag {
-  font-size: 11px;
-  opacity: 0.7;
-}
-.proxy-node-active .node-type-tag {
-  color: rgba(255,255,255,0.6) !important;
 }
 
 .delay-badge {
@@ -292,9 +408,8 @@ function nodeTypeColor(type: string): string {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 11px;
-  font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  font-family: "SF Mono", "Fira Code", monospace;
   background-color: var(--bg-tertiary);
-  transition: background-color 150ms ease;
   min-width: 50px;
   justify-content: center;
 }
