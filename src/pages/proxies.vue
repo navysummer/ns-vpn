@@ -3,6 +3,8 @@ import { ref } from "vue";
 import { RefreshCw, Check, Zap, Globe, Shield, Route } from "lucide-vue-next";
 import { delayQuality, formatDelay } from "@/utils/format";
 import BasePage from "@/components/BasePage.vue";
+import ProviderButton from "@/components/ProviderButton.vue";
+import EmptyState from "@/components/EmptyState.vue";
 import { useToast } from "@/utils/toast";
 
 const { show } = useToast();
@@ -75,15 +77,18 @@ const groups = ref<ProxyGroup[]>([
   },
 ]);
 
+const proxyProviders = ref([
+  { name: "airport-nodes", count: 45, loading: false },
+  { name: "free-nodes", count: 12, loading: false },
+]);
+
 const selectedGroup = ref(groups.value[0].name);
 const testingAll = ref(false);
 const testingGroup = ref<string | null>(null);
 const proxyMode = ref<"rule" | "global" | "direct">("rule");
 const searchQuery = ref("");
 
-function selectGroup(name: string) {
-  selectedGroup.value = name;
-}
+function selectGroup(name: string) { selectedGroup.value = name; }
 
 function selectNode(groupName: string, nodeName: string) {
   const group = groups.value.find((g) => g.name === groupName);
@@ -142,10 +147,12 @@ function typeBadgeBg(type: ProxyGroup["type"]): string {
   }
 }
 
-function nodeTypeColor(type: string): string {
-  if (type === "Direct") return "var(--green)";
-  if (type === "Reject") return "var(--red)";
-  return "var(--text-secondary)";
+function refreshProvider(name: string) {
+  const p = proxyProviders.value.find(x => x.name === name);
+  if (p) {
+    p.loading = true;
+    setTimeout(() => { p.loading = false; }, 1500);
+  }
 }
 </script>
 
@@ -154,30 +161,9 @@ function nodeTypeColor(type: string): string {
     <template #actions>
       <div class="flex items-center gap-2">
         <div class="mode-switcher">
-          <button
-            class="mode-btn"
-            :class="{ 'mode-btn-active': proxyMode === 'rule' }"
-            @click="setProxyMode('rule')"
-          >
-            <Route :size="12" />
-            规则
-          </button>
-          <button
-            class="mode-btn"
-            :class="{ 'mode-btn-active': proxyMode === 'global' }"
-            @click="setProxyMode('global')"
-          >
-            <Globe :size="12" />
-            全局
-          </button>
-          <button
-            class="mode-btn"
-            :class="{ 'mode-btn-active': proxyMode === 'direct' }"
-            @click="setProxyMode('direct')"
-          >
-            <Shield :size="12" />
-            直连
-          </button>
+          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'rule' }" @click="setProxyMode('rule')"><Route :size="12" />规则</button>
+          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'global' }" @click="setProxyMode('global')"><Globe :size="12" />全局</button>
+          <button class="mode-btn" :class="{ 'mode-btn-active': proxyMode === 'direct' }" @click="setProxyMode('direct')"><Shield :size="12" />直连</button>
         </div>
         <button class="btn-ghost text-xs" :disabled="testingAll" @click="testAllDelay">
           <Zap :size="14" :class="{ spin: testingAll }" />
@@ -189,12 +175,7 @@ function nodeTypeColor(type: string): string {
     <div class="flex gap-4 flex-1 min-h-0">
       <div class="proxy-sidebar">
         <div class="proxy-search">
-          <input
-            v-model="searchQuery"
-            placeholder="搜索节点..."
-            class="proxy-search-input"
-            :style="{ color: 'var(--text-primary)' }"
-          />
+          <input v-model="searchQuery" placeholder="搜索节点..." class="proxy-search-input" :style="{ color: 'var(--text-primary)' }" />
         </div>
         <div class="proxy-groups-list">
           <button
@@ -207,13 +188,8 @@ function nodeTypeColor(type: string): string {
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate">{{ group.name }}</div>
               <div class="flex items-center gap-1 mt-0.5">
-                <span
-                  class="type-badge"
-                  :style="{ backgroundColor: typeBadgeBg(group.type), color: typeBadgeColor(group.type) }"
-                >
-                  {{ group.type }}
-                </span>
-                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ group.all.length }} 节点</span>
+                <span class="type-badge" :style="{ backgroundColor: typeBadgeBg(group.type), color: typeBadgeColor(group.type) }">{{ group.type }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ group.all.length }}</span>
               </div>
             </div>
             <span class="text-xs mono" :style="{ color: 'var(--accent)' }">{{ group.now }}</span>
@@ -225,18 +201,11 @@ function nodeTypeColor(type: string): string {
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium">{{ selectedGroup }}</span>
-            <span
-              class="type-badge"
-              :style="{ backgroundColor: typeBadgeBg(groups.find(g => g.name === selectedGroup)!.type), color: typeBadgeColor(groups.find(g => g.name === selectedGroup)!.type) }"
-            >
+            <span class="type-badge" :style="{ backgroundColor: typeBadgeBg(groups.find(g => g.name === selectedGroup)!.type), color: typeBadgeColor(groups.find(g => g.name === selectedGroup)!.type) }">
               {{ groups.find(g => g.name === selectedGroup)!.type }}
             </span>
           </div>
-          <button
-            class="btn-ghost text-xs"
-            :disabled="testingGroup === selectedGroup"
-            @click="testGroupDelay(selectedGroup)"
-          >
+          <button class="btn-ghost text-xs" :disabled="testingGroup === selectedGroup" @click="testGroupDelay(selectedGroup)">
             <Zap :size="12" :class="{ spin: testingGroup === selectedGroup }" />
             {{ testingGroup === selectedGroup ? "测试中..." : "测试" }}
           </button>
@@ -250,29 +219,32 @@ function nodeTypeColor(type: string): string {
             :class="{ 'proxy-node-active': node.now }"
             @click="selectNode(selectedGroup, node.name)"
           >
-            <div class="w-5 shrink-0">
-              <Check v-if="node.now" :size="14" />
-            </div>
+            <div class="w-5 shrink-0"><Check v-if="node.now" :size="14" /></div>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate">{{ node.name }}</div>
-              <div class="text-xs" :style="{ color: node.now ? 'rgba(255,255,255,0.6)' : 'var(--text-secondary)' }">
-                {{ node.type }}
-              </div>
+              <div class="text-xs" :style="{ color: node.now ? 'rgba(255,255,255,0.6)' : 'var(--text-secondary)' }">{{ node.type }}</div>
             </div>
-            <div
-              class="delay-badge"
-              :class="{
-                'delay-good': delayQuality(node.delay) === 'good',
-                'delay-medium': delayQuality(node.delay) === 'medium',
-                'delay-bad': delayQuality(node.delay) === 'bad',
-                'delay-none': delayQuality(node.delay) === 'none',
-                'delay-active': node.now,
-              }"
-            >
+            <div class="delay-badge" :class="{ 'delay-good': delayQuality(node.delay) === 'good', 'delay-medium': delayQuality(node.delay) === 'medium', 'delay-bad': delayQuality(node.delay) === 'bad', 'delay-none': delayQuality(node.delay) === 'none', 'delay-active': node.now }">
               <Zap v-if="node.delay > 0" :size="10" />
               {{ formatDelay(node.delay) }}
             </div>
           </div>
+          <EmptyState v-if="filteredNodes(groups.find(g => g.name === selectedGroup)?.all || []).length === 0" title="暂无节点" />
+        </div>
+      </div>
+
+      <div class="providers-panel">
+        <div class="text-xs font-medium mb-3" :style="{ color: 'var(--text-secondary)' }">代理提供者</div>
+        <div class="space-y-2">
+          <ProviderButton
+            v-for="provider in proxyProviders"
+            :key="provider.name"
+            :name="provider.name"
+            type="proxy"
+            :count="provider.count"
+            :loading="provider.loading"
+            @refresh="refreshProvider(provider.name)"
+          />
         </div>
       </div>
     </div>
@@ -302,13 +274,8 @@ function nodeTypeColor(type: string): string {
   background: transparent;
   color: var(--text-secondary);
 }
-.mode-btn:hover {
-  color: var(--text-primary);
-}
-.mode-btn-active {
-  background-color: var(--accent);
-  color: #fff;
-}
+.mode-btn:hover { color: var(--text-primary); }
+.mode-btn-active { background-color: var(--accent); color: #fff; }
 
 .proxy-sidebar {
   width: 200px;
@@ -327,9 +294,7 @@ function nodeTypeColor(type: string): string {
   font-size: 12px;
   outline: none;
 }
-.proxy-search-input:focus {
-  border-color: var(--accent);
-}
+.proxy-search-input:focus { border-color: var(--accent); }
 
 .proxy-groups-list {
   display: flex;
@@ -352,13 +317,8 @@ function nodeTypeColor(type: string): string {
   text-align: left;
   width: 100%;
 }
-.proxy-group-btn:hover {
-  background-color: var(--bg-hover);
-}
-.proxy-group-btn-active {
-  background-color: rgba(79,142,247,0.1);
-  border: 1px solid rgba(79,142,247,0.3);
-}
+.proxy-group-btn:hover { background-color: var(--bg-hover); }
+.proxy-group-btn-active { background-color: rgba(79,142,247,0.1); border: 1px solid rgba(79,142,247,0.3); }
 
 .proxy-nodes-panel {
   display: flex;
@@ -385,13 +345,8 @@ function nodeTypeColor(type: string): string {
   transition: background-color 150ms ease;
   color: var(--text-primary);
 }
-.proxy-node:hover {
-  background-color: var(--bg-hover);
-}
-.proxy-node-active {
-  background-color: var(--accent) !important;
-  color: #fff !important;
-}
+.proxy-node:hover { background-color: var(--bg-hover); }
+.proxy-node-active { background-color: var(--accent) !important; color: #fff !important; }
 
 .type-badge {
   display: inline-flex;
@@ -418,4 +373,14 @@ function nodeTypeColor(type: string): string {
 .delay-bad { color: var(--red); }
 .delay-none { color: var(--text-secondary); }
 .delay-active { background-color: rgba(255,255,255,0.15); }
+
+.providers-panel {
+  width: 200px;
+  min-width: 200px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  height: fit-content;
+}
 </style>

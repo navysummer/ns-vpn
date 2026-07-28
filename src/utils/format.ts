@@ -12,8 +12,6 @@ export function formatSpeed(bytesPerSec: number): string {
 
 export function formatDelay(ms: number): string {
   if (ms === 0) return "N/A";
-  if (ms < 100) return `${ms}ms`;
-  if (ms < 500) return `${ms}ms`;
   return `${ms}ms`;
 }
 
@@ -32,4 +30,32 @@ export function formatTime(ts: number): string {
 export function formatDate(ts: number): string {
   const d = new Date(ts);
   return d.toLocaleString("zh-CN", { hour12: false });
+}
+
+export function formatRelativeTime(ts: number): string {
+  const now = Date.now();
+  const diff = now - ts;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 10) return "刚刚";
+  if (seconds < 60) return `${seconds}秒前`;
+  if (minutes < 60) return `${minutes}分钟前`;
+  if (hours < 24) return `${hours}小时前`;
+  return `${days}天前`;
+}
+
+export function formatUptime(ms: number): string {
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+export function formatAlive(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  return `${Math.floor(seconds / 3600)}h`;
 }

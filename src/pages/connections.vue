@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { X, Search, ChevronRight, List, LayoutGrid } from "lucide-vue-next";
-import { formatBytes } from "@/utils/format";
+import { X, Search, ChevronRight, List, LayoutGrid, Activity } from "lucide-vue-next";
+import { formatBytes, formatRelativeTime, formatAlive } from "@/utils/format";
 import BasePage from "@/components/BasePage.vue";
+import EmptyState from "@/components/EmptyState.vue";
 
 interface Connection {
   id: string;
@@ -21,7 +22,7 @@ interface Connection {
 }
 
 const connections = ref<Connection[]>(
-  Array.from({ length: 30 }, (_, i) => ({
+  Array.from({ length: 50 }, (_, i) => ({
     id: `conn-${i}`,
     host: `192.168.1.${Math.floor(Math.random() * 255)}`,
     port: Math.floor(Math.random() * 65535) + 1024,
@@ -56,9 +57,7 @@ const totalDownload = computed(() => connections.value.reduce((sum, c) => sum + 
 
 function closeConnection(id: string) {
   connections.value = connections.value.filter((c) => c.id !== id);
-  if (selectedConnection.value?.id === id) {
-    selectedConnection.value = null;
-  }
+  if (selectedConnection.value?.id === id) selectedConnection.value = null;
 }
 
 function closeAll() {
@@ -78,12 +77,6 @@ function ruleColor(rule: string): string {
     default: return "var(--accent)";
   }
 }
-
-function formatAlive(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  return `${Math.floor(seconds / 3600)}h`;
-}
 </script>
 
 <template>
@@ -91,23 +84,11 @@ function formatAlive(seconds: number): string {
     <template #actions>
       <div class="flex items-center gap-3">
         <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">
-          {{ connections.length }} 个连接 · ↓{{ formatBytes(totalDownload) }} ↑{{ formatBytes(totalUpload) }}
+          {{ connections.length }} 连接 · ↓{{ formatBytes(totalDownload) }} ↑{{ formatBytes(totalUpload) }}
         </span>
         <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-          <button
-            class="mode-btn"
-            :class="{ 'mode-btn-active': viewMode === 'table' }"
-            @click="viewMode = 'table'"
-          >
-            <List :size="12" />
-          </button>
-          <button
-            class="mode-btn"
-            :class="{ 'mode-btn-active': viewMode === 'list' }"
-            @click="viewMode = 'list'"
-          >
-            <LayoutGrid :size="12" />
-          </button>
+          <button class="view-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'"><List :size="12" /></button>
+          <button class="view-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'"><LayoutGrid :size="12" /></button>
         </div>
         <button class="btn-ghost text-xs" @click="closeAll">关闭全部</button>
       </div>
@@ -128,7 +109,7 @@ function formatAlive(seconds: number): string {
         </div>
 
         <div class="rounded-xl border flex-1 overflow-hidden flex flex-col" :style="{ borderColor: 'var(--border)' }">
-          <div v-if="viewMode === 'table'" class="flex flex-col flex-1">
+          <template v-if="viewMode === 'table'">
             <div class="grid grid-cols-8 gap-2 px-4 py-2.5 text-xs font-medium shrink-0" :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }">
               <div class="col-span-2">主机</div>
               <div>网络</div>
@@ -138,11 +119,11 @@ function formatAlive(seconds: number): string {
               <div class="text-right">上传</div>
               <div class="text-right">下载</div>
             </div>
-            <div class="divide-y flex-1 overflow-y-auto" :style="{ borderColor: 'var(--border)' }">
+            <div class="conn-scroll">
               <div v-for="conn in filteredConnections" :key="conn.id" class="conn-row" :class="{ 'conn-row-active': selectedConnection?.id === conn.id }" @click="selectConnection(conn)">
-                <div class="col-span-2 flex items-center gap-2">
+                <div class="col-span-2 flex items-center gap-2 min-w-0">
                   <span class="truncate text-xs font-mono">{{ conn.host }}:{{ conn.port }}</span>
-                  <button class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0" :style="{ color: 'var(--red)' }" @click.stop="closeConnection(conn.id)"><X :size="10" /></button>
+                  <button class="conn-close opacity-0 group-hover:opacity-100" :style="{ color: 'var(--red)' }" @click.stop="closeConnection(conn.id)"><X :size="10" /></button>
                 </div>
                 <div><span class="tag" :style="{ backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ conn.network.toUpperCase() }}</span></div>
                 <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }}</div>
@@ -151,29 +132,31 @@ function formatAlive(seconds: number): string {
                 <div class="text-right font-mono text-xs" :style="{ color: 'var(--orange)' }">{{ formatBytes(conn.upload) }}</div>
                 <div class="text-right font-mono text-xs" :style="{ color: 'var(--accent)' }">{{ formatBytes(conn.download) }}</div>
               </div>
-              <div v-if="filteredConnections.length === 0" class="px-4 py-12 text-center text-sm" :style="{ color: 'var(--text-secondary)' }">暂无连接</div>
             </div>
-          </div>
+          </template>
 
-          <div v-else class="flex-1 overflow-y-auto p-2 space-y-1">
-            <div v-for="conn in filteredConnections" :key="conn.id" class="conn-list-item" :class="{ 'conn-list-item-active': selectedConnection?.id === conn.id }" @click="selectConnection(conn)">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-mono truncate">{{ conn.host }}:{{ conn.port }}</span>
-                <div class="flex items-center gap-2">
-                  <span class="tag" :style="{ backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ conn.network.toUpperCase() }}</span>
-                  <span class="text-xs" :style="{ color: ruleColor(conn.rule) }">{{ conn.rule }}</span>
+          <template v-else>
+            <div class="conn-scroll p-2 space-y-1">
+              <div v-for="conn in filteredConnections" :key="conn.id" class="conn-list-item" :class="{ 'conn-list-item-active': selectedConnection?.id === conn.id }" @click="selectConnection(conn)">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-mono truncate">{{ conn.host }}:{{ conn.port }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="tag" :style="{ backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ conn.network.toUpperCase() }}</span>
+                    <span class="text-xs" :style="{ color: ruleColor(conn.rule) }">{{ conn.rule }}</span>
+                  </div>
                 </div>
-              </div>
-              <div class="flex items-center justify-between mt-1">
-                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }} · {{ formatAlive(conn.alive) }}</span>
-                <div class="flex items-center gap-2 text-xs mono">
-                  <span :style="{ color: 'var(--orange)' }">↑{{ formatBytes(conn.upload) }}</span>
-                  <span :style="{ color: 'var(--accent)' }">↓{{ formatBytes(conn.download) }}</span>
+                <div class="flex items-center justify-between mt-1">
+                  <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }} · {{ formatRelativeTime(conn.start) }}</span>
+                  <div class="flex items-center gap-2 text-xs mono">
+                    <span :style="{ color: 'var(--orange)' }">↑{{ formatBytes(conn.upload) }}</span>
+                    <span :style="{ color: 'var(--accent)' }">↓{{ formatBytes(conn.download) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
-            <div v-if="filteredConnections.length === 0" class="py-12 text-center text-sm" :style="{ color: 'var(--text-secondary)' }">暂无连接</div>
-          </div>
+          </template>
+
+          <EmptyState v-if="filteredConnections.length === 0" :icon="Activity" title="暂无连接" description="当前没有活跃的网络连接" />
         </div>
       </div>
 
@@ -194,6 +177,7 @@ function formatAlive(seconds: number): string {
             <div class="detail-row"><span class="detail-label">上传</span><span class="detail-value mono" :style="{ color: 'var(--orange)' }">{{ formatBytes(selectedConnection.upload) }}</span></div>
             <div class="detail-row"><span class="detail-label">下载</span><span class="detail-value mono" :style="{ color: 'var(--accent)' }">{{ formatBytes(selectedConnection.download) }}</span></div>
             <div class="detail-row"><span class="detail-label">存活</span><span class="detail-value mono">{{ formatAlive(selectedConnection.alive) }}</span></div>
+            <div class="detail-row"><span class="detail-label">创建时间</span><span class="detail-value text-xs">{{ formatRelativeTime(selectedConnection.start) }}</span></div>
           </div>
           <button class="btn-ghost text-xs w-full mt-4 justify-center" :style="{ color: 'var(--red)' }" @click="closeConnection(selectedConnection.id)"><X :size="12" />关闭此连接</button>
         </div>
@@ -203,7 +187,7 @@ function formatAlive(seconds: number): string {
 </template>
 
 <style scoped>
-.mode-btn {
+.view-btn {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -216,14 +200,20 @@ function formatAlive(seconds: number): string {
   background: transparent;
   color: var(--text-secondary);
 }
-.mode-btn:hover { color: var(--text-primary); }
-.mode-btn-active { background-color: var(--accent); color: #fff; }
+.view-btn:hover { color: var(--text-primary); }
+.view-btn.active { background-color: var(--accent); color: #fff; }
+
+.conn-scroll {
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 280px);
+}
 
 .conn-row {
   display: grid;
   grid-template-columns: 2fr 1fr 1fr 1fr 0.5fr 0.5fr 0.5fr;
   gap: 8px;
-  padding: 8px 16px;
+  padding: 6px 16px;
   font-size: 13px;
   align-items: center;
   transition: background-color 100ms ease;
@@ -231,6 +221,10 @@ function formatAlive(seconds: number): string {
 }
 .conn-row:hover { background-color: var(--bg-hover); }
 .conn-row-active { background-color: rgba(79,142,247,0.08) !important; }
+
+.conn-close {
+  transition: opacity 150ms ease;
+}
 
 .conn-list-item {
   padding: 8px 12px;

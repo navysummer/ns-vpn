@@ -2,6 +2,7 @@
 import { ref, computed, nextTick, watch } from "vue";
 import { Terminal, Download, Pause, Play, ArrowUpDown } from "lucide-vue-next";
 import BasePage from "@/components/BasePage.vue";
+import EmptyState from "@/components/EmptyState.vue";
 
 interface LogEntry {
   time: string;
@@ -17,7 +18,7 @@ const sortOrder = ref<"asc" | "desc">("asc");
 const searchQuery = ref("");
 
 const logs = ref<LogEntry[]>(
-  Array.from({ length: 100 }, (_, i) => {
+  Array.from({ length: 200 }, (_, i) => {
     const levels = ["info", "warning", "error"] as const;
     const types = ["INIT", "PROXY", "DNS", "TUN", "HTTP"];
     const messages = [
@@ -32,7 +33,7 @@ const logs = ref<LogEntry[]>(
       "Subscription updated: 45 nodes available",
       "Proxy HK-01: delay 32ms",
     ];
-    const time = new Date(Date.now() - (100 - i) * 5000);
+    const time = new Date(Date.now() - (200 - i) * 3000);
     return {
       time: time.toLocaleTimeString("zh-CN", { hour12: false }),
       type: types[Math.floor(Math.random() * types.length)],
@@ -71,13 +72,8 @@ watch(
   }
 );
 
-function clearLogs() {
-  logs.value = [];
-}
-
-function togglePause() {
-  paused.value = !paused.value;
-}
+function clearLogs() { logs.value = []; }
+function togglePause() { paused.value = !paused.value; }
 
 function levelColor(level: string): string {
   switch (level) {
@@ -126,14 +122,10 @@ function exportLogs() {
       <div class="flex items-center gap-2">
         <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ filteredLogs.length }} 条</span>
         <button class="btn-ghost text-xs" @click="togglePause">
-          <Pause v-if="!paused" :size="12" />
-          <Play v-else :size="12" />
+          <Pause v-if="!paused" :size="12" /><Play v-else :size="12" />
           {{ paused ? "继续" : "暂停" }}
         </button>
-        <button class="btn-ghost text-xs" @click="exportLogs">
-          <Download :size="12" />
-          导出
-        </button>
+        <button class="btn-ghost text-xs" @click="exportLogs"><Download :size="12" />导出</button>
         <button class="btn-ghost text-xs" @click="clearLogs">清空</button>
       </div>
     </template>
@@ -148,9 +140,7 @@ function exportLogs() {
         <input v-model="searchQuery" placeholder="搜索日志..." class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
       </div>
       <label class="flex items-center gap-2 text-sm cursor-pointer" :style="{ color: 'var(--text-secondary)' }">
-        <div class="toggle" :class="{ active: autoScroll }" @click="autoScroll = !autoScroll">
-          <div class="toggle-knob"></div>
-        </div>
+        <div class="toggle" :class="{ active: autoScroll }" @click="autoScroll = !autoScroll"><div class="toggle-knob"></div></div>
         自动滚动
       </label>
       <button class="btn-ghost text-xs" @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'">
@@ -159,7 +149,7 @@ function exportLogs() {
       </button>
     </div>
 
-    <div ref="logContainer" class="rounded-xl border overflow-y-auto font-mono text-xs leading-relaxed flex-1" :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }">
+    <div ref="logContainer" class="log-container rounded-xl border overflow-y-auto font-mono text-xs leading-relaxed flex-1" :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }">
       <div class="p-4 space-y-0.5">
         <div v-for="(log, i) in filteredLogs" :key="i" class="log-line hover:opacity-80">
           <span class="log-time">[{{ log.time }}]</span>
@@ -167,16 +157,17 @@ function exportLogs() {
           <span class="log-type" :style="{ color: typeColor(log.type) }">[{{ log.type }}]</span>
           <span class="log-payload">{{ log.payload }}</span>
         </div>
-        <div v-if="filteredLogs.length === 0" class="py-8 text-center" :style="{ color: 'var(--text-secondary)' }">
-          <Terminal :size="24" class="mx-auto mb-2 opacity-30" />
-          暂无日志
-        </div>
       </div>
+      <EmptyState v-if="filteredLogs.length === 0" :icon="Terminal" title="暂无日志" />
     </div>
   </BasePage>
 </template>
 
 <style scoped>
+.log-container {
+  min-height: 0;
+}
+
 .log-line {
   display: flex;
   gap: 8px;

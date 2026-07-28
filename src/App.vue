@@ -3,6 +3,7 @@ import { watch } from "vue";
 import { useAppStore } from "@/stores/app";
 import Sidebar from "@/components/Sidebar.vue";
 import ToastContainer from "@/components/ToastContainer.vue";
+import ScrollToTop from "@/components/ScrollToTop.vue";
 
 const app = useAppStore();
 
@@ -36,5 +37,6 @@ watch(
       </router-view>
     </main>
     <ToastContainer />
+    <ScrollToTop />
   </div>
 </template>
