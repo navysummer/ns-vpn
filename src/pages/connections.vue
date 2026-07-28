@@ -1,248 +1,180 @@
-<template>
-  <BasePage
-    full
-    :content-style="{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'hidden',
-      borderRadius: '8px',
-      minHeight: 0,
-    }"
-  >
-    <template #title>
-      <span style="white-space: nowrap;">{{ t('connections.page.title') }}</span>
-    </template>
-    <template #header>
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <div style="margin-left: 8px; margin-right: 8px;">
-          {{ t('shared.labels.downloaded') }}: {{ parseTraffic(traffic?.downTotal || 0) }}
-        </div>
-        <div style="margin-left: 8px; margin-right: 8px;">
-          {{ t('shared.labels.uploaded') }}: {{ parseTraffic(traffic?.upTotal || 0) }}
-        </div>
-        <button
-          class="MuiIconButton-root MuiIconButton-sizeSmall"
-          @click="toggleLayout"
-        >
-          <svg v-if="isTableLayout" viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/></svg>
-          <svg v-else viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M3 3h18v2H3V3zm0 8h18v2H3v-2zm0 8h18v2H3v-2z"/></svg>
-        </button>
-        <button class="MuiButton-root MuiButton-contained MuiButton-sizeSmall" @click="onCloseAll">
-          <span style="white-space: nowrap;">{{ t('shared.actions.closeAll') }}</span>
-        </button>
-      </div>
-    </template>
-
-    <div
-      style="
-        padding-top: 8px;
-        margin-bottom: 4px;
-        margin-left: 10px;
-        margin-right: 10px;
-        min-height: 36px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        user-select: text;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-      "
-    >
-      <div style="display: flex; margin-right: 8px; flex-basis: content; gap: 0;">
-        <button
-          class="MuiButton-root MuiButton-sizeSmall"
-          :class="connectionsType === 'active' ? 'MuiButton-contained' : 'MuiButton-outlined'"
-          style="border-radius: 0;"
-          @click="selectConnectionsType('active')"
-        >
-          {{ t('connections.components.actions.active') }} {{ connections?.activeConnections.length }}
-        </button>
-        <button
-          class="MuiButton-root MuiButton-sizeSmall"
-          :class="connectionsType === 'closed' ? 'MuiButton-contained' : 'MuiButton-outlined'"
-          style="border-radius: 0;"
-          @click="selectConnectionsType('closed')"
-        >
-          {{ t('connections.components.actions.closed') }} {{ connections?.closedConnections.length }}
-        </button>
-      </div>
-      <select
-        v-if="!isTableLayout"
-        v-model="curOrderOpt"
-        style="padding: 4px 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color); font-size: 14px;"
-      >
-        <option v-for="option in ORDER_OPTIONS" :key="option.id" :value="option.id">
-          {{ t(option.labelKey) }}
-        </option>
-      </select>
-      <div style="flex: 1; display: flex; align-items: center;">
-        <input
-          type="text"
-          :placeholder="t('shared.search')"
-          style="flex: 1; padding: 6px 12px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-color); color: var(--text-color); box-sizing: border-box;"
-          @input="handleSearch(($event.target as HTMLInputElement).value)"
-        />
-      </div>
-      <button
-        v-if="isTableLayout && filterConn.length > 0"
-        class="MuiIconButton-root MuiIconButton-sizeSmall"
-        :title="t('connections.components.columnManager.title')"
-        :aria-label="t('connections.components.columnManager.title')"
-        style="flex: 0 0 auto;"
-        @click="isColumnManagerOpen = true"
-      >
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M4 5v14h16V5H4zm6 12H6v-2h4v2zm0-4H6v-2h4v2zm0-4H6V7h4v2zm8 8h-6v-2h6v2zm0-4h-6v-2h6v2zm0-4h-6V7h6v2z"/></svg>
-      </button>
-    </div>
-
-    <div v-if="filterConn.length === 0">
-      <BaseEmpty />
-    </div>
-    <ConnectionTable
-      v-else-if="isTableLayout"
-      :connections="filterConn"
-      :on-show-detail="showDetailById"
-      :column-manager-open="isColumnManagerOpen"
-      :on-close-column-manager="() => isColumnManagerOpen = false"
-    />
-    <div
-      v-else
-      style="flex: 1; border-radius: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;"
-    >
-      <ConnectionRowItem
-        v-for="row in displayRows"
-        :key="row.id"
-        :row="row"
-        :closed="connectionsType === 'closed'"
-        :on-show-detail="showDetailById"
-      />
-    </div>
-
-    <ConnectionDetail ref="detailRef" />
-
-    <div
-      v-if="connectionsType === 'closed' && filterConn.length > 0"
-      style="position: absolute; right: 16px; bottom: 16px; z-index: 1050;"
-    >
-      <button
-        class="MuiFab-root MuiFab-extended MuiFab-sizeMedium MuiFab-primary"
-        style="display: flex; align-items: center; gap: 8px;"
-        @click="clearClosedConnections()"
-      >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-        {{ t('shared.actions.clear') }}
-      </button>
-    </div>
-  </BasePage>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { closeAllConnections } from 'tauri-plugin-mihomo-api'
+import { ref, computed } from "vue";
+import { X, ArrowUp, ArrowDown, Search } from "lucide-vue-next";
+import { formatBytes, formatTime } from "@/utils/format";
 
-import { BaseEmpty, BasePage, BaseSearchBox, BaseStyledSelect } from '@/components/base'
-import ConnectionDetail from '@/components/connection/connection-detail.vue'
-import ConnectionRowItem from '@/components/connection/connection-row-item.vue'
-import { getConnectionStartTime, useConnectionRowViews } from '@/components/connection/connection-row-view'
-import ConnectionTable from '@/components/connection/connection-table.vue'
-import { useConnectionData } from '@/hooks/use-connection-data'
-import { useConnectionSetting } from '@/hooks/use-connection-setting'
-import { useTrafficData } from '@/hooks/use-traffic-data'
-import { useVisibility } from '@/hooks/use-visibility'
-import parseTraffic from '@/utils/parse-traffic'
-
-type OrderFunc = (list: IConnectionsItem[]) => IConnectionsItem[]
-
-const ORDER_OPTIONS = [
-  {
-    id: 'default',
-    labelKey: 'connections.components.order.default',
-    fn: (list: IConnectionsItem[]) => list.sort((a, b) => getConnectionStartTime(b) - getConnectionStartTime(a)),
-  },
-  {
-    id: 'uploadSpeed',
-    labelKey: 'connections.components.order.uploadSpeed',
-    fn: (list: IConnectionsItem[]) => list.sort((a, b) => (b.curUpload ?? 0) - (a.curUpload ?? 0)),
-  },
-  {
-    id: 'downloadSpeed',
-    labelKey: 'connections.components.order.downloadSpeed',
-    fn: (list: IConnectionsItem[]) => list.sort((a, b) => (b.curDownload ?? 0) - (a.curDownload ?? 0)),
-  },
-] as const
-
-type OrderKey = (typeof ORDER_OPTIONS)[number]['id']
-
-const { t } = useI18n()
-const pageVisible = useVisibility()
-const matchText = ref('')
-const hasSearch = ref(false)
-const curOrderOpt = ref<OrderKey>('default')
-const connectionsType = ref<'active' | 'closed'>('active')
-
-const { response: { data: connections }, clearClosedConnections } = useConnectionData({ enabled: pageVisible })
-const { response: { data: traffic } } = useTrafficData({ enabled: pageVisible })
-const setting = useConnectionSetting()
-
-const isTableLayout = computed(() => setting?.layout === 'table')
-const isColumnManagerOpen = ref(false)
-
-const selectedConnections = computed(() =>
-  connectionsType.value === 'active'
-    ? (connections?.activeConnections ?? EMPTY_CONNECTIONS)
-    : (connections?.closedConnections ?? EMPTY_CONNECTIONS),
-)
-
-const EMPTY_CONNECTIONS: IConnectionsItem[] = []
-
-const filterConn = computed(() => {
-  const orderFunc = ORDER_OPTIONS.find(o => o.id === curOrderOpt.value)?.fn
-  if (isTableLayout.value && !hasSearch.value) return selectedConnections.value
-  if (!hasSearch.value) return orderFunc ? orderFunc([...selectedConnections.value]) : [...selectedConnections.value]
-  const matchConns = selectedConnections.value.filter((conn: IConnectionsItem) => {
-    const { host, destinationIP, process } = conn.metadata
-    return matchConn(host || '') || matchConn(destinationIP || '') || matchConn(process || '')
-  })
-  return orderFunc ? orderFunc(matchConns) : matchConns
-})
-
-const matchConn = (input: string) => input.toLowerCase().includes(matchText.value.toLowerCase())
-
-const displayRows = useConnectionRowViews(
-  isTableLayout.value ? EMPTY_CONNECTIONS : filterConn.value,
-)
-
-const detailRef = ref<InstanceType<typeof ConnectionDetail> | null>(null)
-
-const selectConnectionsType = (type: 'active' | 'closed') => {
-  if (type === connectionsType.value) return
-  detailRef.value?.close()
-  isColumnManagerOpen.value = false
-  connectionsType.value = type
+interface Connection {
+  id: string;
+  host: string;
+  port: number;
+  network: "tcp" | "udp";
+  type: string;
+  rule: string;
+  chains: string[];
+  upload: number;
+  download: number;
+  start: number;
+  alive: number;
 }
 
-const showDetailById = (id: string) => {
-  const connection = filterConn.value.find((item: IConnectionsItem) => item.id === id)
-  if (connection) detailRef.value?.open(connection, connectionsType.value === 'closed')
+const connections = ref<Connection[]>(
+  Array.from({ length: 30 }, (_, i) => ({
+    id: `conn-${i}`,
+    host: `192.168.1.${Math.floor(Math.random() * 255)}`,
+    port: Math.floor(Math.random() * 65535) + 1024,
+    network: Math.random() > 0.2 ? "tcp" : "udp",
+    type: ["HTTP", "HTTPS", "QUIC", "WebSocket"][Math.floor(Math.random() * 4)],
+    rule: ["Proxy", "Direct", "Reject", "Media"][Math.floor(Math.random() * 4)],
+    chains: ["Proxy", "Auto"],
+    upload: Math.floor(Math.random() * 10000),
+    download: Math.floor(Math.random() * 1000000),
+    start: Date.now() - Math.floor(Math.random() * 600000),
+    alive: Math.floor(Math.random() * 300),
+  }))
+);
+
+const searchQuery = ref("");
+const filterNetwork = ref<"all" | "tcp" | "udp">("all");
+
+const filteredConnections = computed(() => {
+  return connections.value.filter((c) => {
+    if (searchQuery.value && !c.host.includes(searchQuery.value)) return false;
+    if (filterNetwork.value !== "all" && c.network !== filterNetwork.value) return false;
+    return true;
+  });
+});
+
+function closeConnection(id: string) {
+  connections.value = connections.value.filter((c) => c.id !== id);
 }
 
-let closeAllLock = false
-const onCloseAll = async () => {
-  if (closeAllLock) return
-  closeAllLock = true
-  try { await closeAllConnections() }
-  finally { closeAllLock = false }
-}
-
-const handleSearch = (text: string) => {
-  matchText.value = text
-  hasSearch.value = text.length > 0
-}
-
-const toggleLayout = () => {
-  setSetting((o: any) => o?.layout !== 'table' ? { ...o, layout: 'table' } : { ...o, layout: 'list' })
+function closeAll() {
+  connections.value = [];
 }
 </script>
+
+<template>
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">连接</h1>
+      <div class="flex items-center gap-2">
+        <span class="text-sm" :style="{ color: 'var(--text-secondary)' }">
+          {{ connections.length }} 个活跃连接
+        </span>
+        <button class="btn-ghost text-xs" @click="closeAll">关闭全部</button>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex items-center gap-3">
+      <div
+        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs"
+        :style="{ backgroundColor: 'var(--bg-tertiary)' }"
+      >
+        <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
+        <input
+          v-model="searchQuery"
+          placeholder="搜索主机..."
+          class="bg-transparent outline-none flex-1 text-sm"
+          :style="{ color: 'var(--text-primary)' }"
+        />
+      </div>
+      <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
+        <button
+          v-for="opt in ([{ label: '全部', value: 'all' }, { label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp' }] as const)"
+          :key="opt.value"
+          class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+          :style="{
+            backgroundColor: filterNetwork === opt.value ? 'var(--accent)' : 'transparent',
+            color: filterNetwork === opt.value ? '#fff' : 'var(--text-secondary)',
+          }"
+          @click="filterNetwork = opt.value"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="rounded-xl overflow-hidden border" :style="{ borderColor: 'var(--border)' }">
+      <!-- Table header -->
+      <div
+        class="grid grid-cols-7 gap-2 px-4 py-2.5 text-xs font-medium"
+        :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }"
+      >
+        <div class="col-span-2">主机</div>
+        <div>网络</div>
+        <div>类型</div>
+        <div>规则</div>
+        <div class="text-right">上传</div>
+        <div class="text-right">下载</div>
+      </div>
+
+      <!-- Table body -->
+      <div
+        class="divide-y max-h-[calc(100vh-320px)] overflow-y-auto"
+        :style="{ borderColor: 'var(--border)' }"
+      >
+        <div
+          v-for="conn in filteredConnections"
+          :key="conn.id"
+          class="grid grid-cols-7 gap-2 px-4 py-2.5 text-sm items-center transition-colors duration-150 group"
+          :style="{
+            borderColor: 'var(--border)',
+          }"
+          @mouseenter="(e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-hover)'"
+          @mouseleave="(e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+        >
+          <div class="col-span-2 flex items-center gap-2">
+            <span class="truncate">{{ conn.host }}:{{ conn.port }}</span>
+            <button
+              class="opacity-0 group-hover:opacity-100 transition-opacity"
+              :style="{ color: 'var(--red)' }"
+              @click="closeConnection(conn.id)"
+            >
+              <X :size="12" />
+            </button>
+          </div>
+          <div>
+            <span
+              class="text-xs px-1.5 py-0.5 rounded"
+              :style="{
+                backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.15)' : 'rgba(52,199,89,0.15)',
+                color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)',
+              }"
+            >
+              {{ conn.network.toUpperCase() }}
+            </span>
+          </div>
+          <div :style="{ color: 'var(--text-secondary)' }">{{ conn.type }}</div>
+          <div>
+            <span
+              class="text-xs"
+              :style="{
+                color: conn.rule === 'Direct' ? 'var(--green)' : conn.rule === 'Reject' ? 'var(--red)' : 'var(--accent)',
+              }"
+            >
+              {{ conn.rule }}
+            </span>
+          </div>
+          <div class="text-right font-mono text-xs" :style="{ color: 'var(--orange)' }">
+            {{ formatBytes(conn.upload) }}
+          </div>
+          <div class="text-right font-mono text-xs" :style="{ color: 'var(--accent)' }">
+            {{ formatBytes(conn.download) }}
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div
+          v-if="filteredConnections.length === 0"
+          class="px-4 py-12 text-center text-sm"
+          :style="{ color: 'var(--text-secondary)' }"
+        >
+          暂无连接
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

@@ -1,62 +1,48 @@
 {
-  "version": "0.1.0",
-  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-config-schema/schema.json",
+  "productName": "NS VPN",
+  "version": "1.0.0",
+  "identifier": "io.github.ns-vpn",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:5000",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "NS VPN",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    },
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    }
+  },
   "bundle": {
     "active": true,
-    "longDescription": "NS VPN",
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
-      "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "resources": ["resources"],
-    "publisher": "NS VPN",
-    "externalBin": ["sidecar/verge-mihomo", "sidecar/verge-mihomo-alpha"],
-    "copyright": "GNU General Public License v3.0",
-    "category": "DeveloperTool",
-    "shortDescription": "NS VPN",
-    "createUpdaterArtifacts": true
+    ]
   },
-  "build": {
-    "beforeBuildCommand": "pnpm run web:build",
-    "frontendDist": "../dist",
-    "beforeDevCommand": "pnpm run web:dev",
-    "devUrl": "http://localhost:3000/",
-    "removeUnusedCommands": true
-  },
-  "productName": "NS VPN",
-  "identifier": "com.ns-vpn.desktop",
   "plugins": {
-    "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQyOEMyRjBCQkVGOUJEREYKUldUZnZmbStDeStNMHU5Mmo1N24xQXZwSVRYbXA2NUpzZE5oVzlqeS9Bc0t6RVV4MmtwVjBZaHgK",
-      "endpoints": [
-        "https://update.hwdns.net/https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update-proxy.json",
-        "https://gh-proxy.org/https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update-proxy.json",
-        "https://github.com/clash-verge-rev/clash-verge-rev/releases/download/updater/update.json"
-      ],
-      "windows": {
-        "installMode": "passive"
-      }
-    },
-    "deep-link": {
-      "desktop": {
-        "schemes": ["clash", "clash-verge"]
-      }
-    }
-  },
-  "app": {
-    "security": {
-      "capabilities": ["desktop-capability", "migrated"],
-      "assetProtocol": {
-        "enable": true,
-        "scope": {
-          "allow": ["**"],
-          "requireLiteralLeadingDot": false
-        }
-      },
-      "csp": null
+    "shell": {
+      "open": true
     }
   }
 }

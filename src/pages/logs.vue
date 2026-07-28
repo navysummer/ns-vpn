@@ -1,219 +1,147 @@
-<template>
-  <BasePage
-    full
-    :content-style="{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'auto',
-    }"
-  >
-    <template #title>
-      {{ t('logs.page.title') }}
-    </template>
-    <template #header>
-      <div style="display: flex; align-items: center; gap: 16px">
-        <n-button
-          quaternary
-          circle
-          size="small"
-          :title="t(enableLog ? 'shared.actions.pause' : 'shared.actions.resume')"
-          :aria-label="t(enableLog ? 'shared.actions.pause' : 'shared.actions.resume')"
-          @click="handleToggleLog"
-        >
-          <template #icon>
-            <svg
-              v-if="enableLog"
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="currentColor"
-            >
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14h-2V8h2v8zm4 0h-2V8h2v8z"
-              />
-            </svg>
-            <svg
-              v-else
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="currentColor"
-            >
-              <path
-                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"
-              />
-            </svg>
-          </template>
-        </n-button>
-        <n-button
-          quaternary
-          circle
-          size="small"
-          :title="t(isDescending ? 'logs.actions.showAscending' : 'logs.actions.showDescending')"
-          :aria-label="t(isDescending ? 'logs.actions.showAscending' : 'logs.actions.showDescending')"
-          @click="handleToggleOrder"
-        >
-          <template #icon>
-            <svg
-              viewBox="0 0 24 24"
-              width="20"
-              height="20"
-              fill="currentColor"
-              :style="{ transform: isDescending ? 'scaleY(-1)' : 'none', transition: 'transform 0.2s ease' }"
-            >
-              <path
-                d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z"
-              />
-            </svg>
-          </template>
-        </n-button>
-
-        <n-button size="small" type="primary" @click="handleClear">
-          {{ t('shared.actions.clear') }}
-        </n-button>
-      </div>
-    </template>
-
-    <div
-      style="
-        padding-top: 8px;
-        margin-bottom: 4px;
-        margin-left: 10px;
-        margin-right: 10px;
-        height: 39px;
-        display: flex;
-        align-items: center;
-      "
-    >
-      <n-select
-        :value="logState"
-        :options="logLevelOptions"
-        size="small"
-        style="width: 120px"
-        @update:value="handleLogLevelChange"
-      />
-      <BaseSearchBox
-        :on-search="
-          (matcher: any, state: any) => {
-            matchFunc = matcher
-            searchState = state
-          }
-        "
-      />
-    </div>
-
-    <template v-if="filteredLogs.length > 0">
-      <VirtualList
-        ref="virtuosoRef"
-        :count="filteredLogs.length"
-        :estimate-size="50"
-        :style="{ flex: 1 }"
-        :on-scroll="handleScroll"
-      >
-        <template #item="{ index }">
-          <LogItem :value="filteredLogs[index]" :search-state="searchState" />
-        </template>
-      </VirtualList>
-    </template>
-    <BaseEmpty v-else />
-  </BasePage>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useTranslation } from '@/composables/use-i18n'
+import { ref, computed, nextTick, watch } from "vue";
+import { Terminal } from "lucide-vue-next";
 
-import {
-  BaseEmpty,
-  BasePage,
-  BaseSearchBox,
-  VirtualList,
-} from '@/components/base'
-import LogItem from '@/components/log/log-item.vue'
-import { useClashLog } from '@/hooks/use-clash-log'
-import { useLogData } from '@/hooks/use-log-data'
+interface LogEntry {
+  time: string;
+  type: string;
+  level: string;
+  payload: string;
+}
 
-const { t } = useTranslation()
-const [clashLog, setClashLog] = useClashLog()
-const enableLog = clashLog.enable
-const logState = clashLog.logFilter
-const logOrder = clashLog.logOrder ?? 'asc'
-const isDescending = logOrder === 'desc'
+const logLevel = ref<"all" | "info" | "warning" | "error">("all");
+const autoScroll = ref(true);
 
-const matchFunc = ref((_: string) => true)
-const searchState = ref<any>(undefined)
-const {
-  response: { data: logData },
-  refreshGetClashLog,
-} = useLogData()
-
-const filterLogs = computed(() => {
-  if (!logData || logData.length === 0) {
-    return []
-  }
-
-  return logData.filter((data: any) => {
-    const searchText =
-      `${data.time || ''} ${data.type} ${data.payload}`.toLowerCase()
-
-    const matchesSearch = matchFunc.value(searchText)
-
-    return (
-      (logState == 'all' ? true : data.type.includes(logState)) &&
-      matchesSearch
-    )
+const logs = ref<LogEntry[]>(
+  Array.from({ length: 100 }, (_, i) => {
+    const levels = ["info", "warning", "error"] as const;
+    const types = ["INIT", "PROXY", "DNS", "TUN", "HTTP"];
+    const messages = [
+      "Connected to mihomo core v1.18.0",
+      "Loading configuration from /etc/mihomo/config.yaml",
+      "Proxy group Auto: health check passed",
+      "DNS query: example.com -> 1.1.1.1",
+      "New TCP connection: 192.168.1.100:54321 -> 10.0.0.1:443",
+      "TUN device opened: utun4",
+      "Rule match: DOMAIN-SUFFIX,google.com,Proxy",
+      "Memory usage: 45.2MB",
+      "Subscription updated: 45 nodes available",
+      "Proxy HK-01: delay 32ms",
+    ];
+    const time = new Date(Date.now() - (100 - i) * 5000);
+    return {
+      time: time.toLocaleTimeString("zh-CN", { hour12: false }),
+      type: types[Math.floor(Math.random() * types.length)],
+      level: levels[Math.floor(Math.random() * 3)],
+      payload: messages[Math.floor(Math.random() * messages.length)],
+    };
   })
-})
+);
 
-const filteredLogs = computed(() =>
-  isDescending ? [...filterLogs.value].reverse() : filterLogs.value,
-)
+const filteredLogs = computed(() => {
+  if (logLevel.value === "all") return logs.value;
+  return logs.value.filter((l) => l.level === logLevel.value);
+});
 
-const logLevelOptions = computed(() => [
-  { label: t('shared.filters.logLevels.all'), value: 'all' },
-  { label: t('shared.filters.logLevels.debug'), value: 'debug' },
-  { label: t('shared.filters.logLevels.info'), value: 'info' },
-  { label: t('shared.filters.logLevels.warn'), value: 'warn' },
-  { label: t('shared.filters.logLevels.error'), value: 'err' },
-])
-
-const scrollRef = ref({ isNearBottom: true })
-const virtuosoRef = ref<InstanceType<typeof VirtualList> | null>(null)
+const logContainer = ref<HTMLDivElement | null>(null);
 
 watch(
-  () => filteredLogs.value.length,
-  (newLen, oldLen) => {
-    if (!isDescending && scrollRef.value.isNearBottom) {
-      virtuosoRef.value?.scrollToIndex(newLen - 1, {
-        behavior: 'smooth' as ScrollBehavior,
-      })
+  () => logs.value.length,
+  async () => {
+    if (autoScroll.value) {
+      await nextTick();
+      if (logContainer.value) {
+        logContainer.value.scrollTop = logContainer.value.scrollHeight;
+      }
     }
-  },
-)
+  }
+);
 
-const handleLogLevelChange = (newLevel: LogFilter) => {
-  setClashLog((pre: any) => ({ ...pre, logFilter: newLevel }))
-}
-
-const handleToggleLog = async () => {
-  setClashLog((pre: any) => ({ ...pre, enable: !enableLog }))
-}
-
-const handleToggleOrder = () => {
-  setClashLog((pre: any) => ({
-    ...pre,
-    logOrder: pre.logOrder === 'desc' ? 'asc' : 'desc',
-  }))
-}
-
-const handleClear = () => {
-  refreshGetClashLog(true)
-}
-
-const handleScroll = (event: Event) => {
-  const element = event.currentTarget as HTMLDivElement
-  scrollRef.value.isNearBottom =
-    element.scrollHeight - element.scrollTop - element.clientHeight <= 20
+function clearLogs() {
+  logs.value = [];
 }
 </script>
+
+<template>
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">日志</h1>
+      <button class="btn-ghost text-xs" @click="clearLogs">清空</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="flex items-center gap-3">
+      <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
+        <button
+          v-for="opt in ([{ label: '全部', value: 'all' }, { label: '信息', value: 'info' }, { label: '警告', value: 'warning' }, { label: '错误', value: 'error' }] as const)"
+          :key="opt.value"
+          class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
+          :style="{
+            backgroundColor: logLevel === opt.value ? 'var(--accent)' : 'transparent',
+            color: logLevel === opt.value ? '#fff' : 'var(--text-secondary)',
+          }"
+          @click="logLevel = opt.value"
+        >
+          {{ opt.label }}
+        </button>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm cursor-pointer" :style="{ color: 'var(--text-secondary)' }">
+        <div
+          class="toggle"
+          :class="{ 'toggle-bg': true, active: autoScroll }"
+          @click="autoScroll = !autoScroll"
+        >
+          <div class="toggle-knob"></div>
+        </div>
+        自动滚动
+      </label>
+    </div>
+
+    <!-- Log output -->
+    <div
+      ref="logContainer"
+      class="rounded-xl border overflow-y-auto font-mono text-xs leading-relaxed"
+      :style="{
+        backgroundColor: 'var(--bg-secondary)',
+        borderColor: 'var(--border)',
+        height: 'calc(100vh - 260px)',
+        color: 'var(--text-primary)',
+      }"
+    >
+      <div class="p-4 space-y-0.5">
+        <div
+          v-for="(log, i) in filteredLogs"
+          :key="i"
+          class="flex gap-3 py-0.5 hover:opacity-80"
+        >
+          <span class="shrink-0" :style="{ color: 'var(--text-secondary)' }">[{{ log.time }}]</span>
+          <span
+            class="shrink-0"
+            :style="{
+              color: log.level === 'error'
+                ? 'var(--red)'
+                : log.level === 'warning'
+                ? 'var(--orange)'
+                : 'var(--text-secondary)',
+            }"
+          >
+            {{ log.level.toUpperCase() }}
+          </span>
+          <span
+            class="shrink-0"
+            :style="{ color: 'var(--accent)' }"
+          >
+            [{{ log.type }}]
+          </span>
+          <span>{{ log.payload }}</span>
+        </div>
+        <div v-if="filteredLogs.length === 0" class="py-8 text-center" :style="{ color: 'var(--text-secondary)' }">
+          <Terminal :size="24" class="mx-auto mb-2 opacity-30" />
+          暂无日志
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

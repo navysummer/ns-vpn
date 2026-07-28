@@ -1,108 +1,240 @@
 <script setup lang="ts">
-import i18n from 'i18next'
+import { ref } from "vue";
+import { FolderOpen, RotateCw, Download, Wifi, Monitor, Globe } from "lucide-vue-next";
 
-import { BasePage } from '@/components/base'
-import SettingClash from '@/components/setting/setting-clash.vue'
-import SettingSystem from '@/components/setting/setting-system.vue'
-import SettingVergeAdvanced from '@/components/setting/setting-verge-advanced.vue'
-import SettingVergeBasic from '@/components/setting/setting-verge-basic.vue'
-import { openWebUrl } from '@/services/cmds'
-import { showNotice } from '@/services/notice-service'
-import { useThemeMode } from '@/services/states'
+const mixedPort = ref(7890);
+const apiPort = ref(9090);
+const allowLan = ref(false);
+const logLevel = ref("info");
+const systemProxy = ref(false);
+const tunMode = ref(false);
+const startAtBoot = ref(false);
+const autoUpdate = ref(false);
+const themeMode = ref("dark");
+const language = ref("zh-CN");
 
-const mode = useThemeMode()
-const isDark = mode === 'light' ? false : true
-
-const onError = (err: any) => {
-  showNotice.error(err)
+function saveConfig() {
+  // In a real app, this would call Tauri commands
+  console.log("Config saved");
 }
 
-const toGithubRepo = async () => {
-  await openWebUrl('https://github.com/clash-verge-rev/clash-verge-rev')
+function selectCorePath() {
+  // Would use Tauri dialog
 }
 
-const toGithubDoc = async () => {
-  await openWebUrl('https://clash-verge-rev.github.io/index.html')
-}
-
-const toTelegramChannel = async () => {
-  await openWebUrl('https://t.me/clash_verge_re')
+function selectConfigPath() {
+  // Would use Tauri dialog
 }
 </script>
 
 <template>
-  <BasePage
-    :title="i18n.t('settings.page.title')"
-  >
-    <template #header>
-      <div class="MuiButtonGroup-root MuiButtonGroup-contained">
-        <button
-          class="MuiIconButton-root MuiIconButton-sizeMedium"
-          :title="i18n.t('settings.page.actions.manual')"
-          @click="toGithubDoc"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H8c0-2.21 1.79-4 4-4s4 1.79 4 4c0 .88-.36 1.68-.93 2.25z"/></svg>
-        </button>
-        <button
-          class="MuiIconButton-root MuiIconButton-sizeMedium"
-          :title="i18n.t('settings.page.actions.telegram')"
-          @click="toTelegramChannel"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.12.02-1.96 1.25-5.54 3.66-.52.36-1 .53-1.42.52-.47-.01-1.37-.26-2.04-.48-.82-.27-1.47-.42-1.41-.88.03-.24.36-.49.99-.74 3.92-1.71 6.54-2.84 7.85-3.37 3.74-1.52 4.52-1.78 5.03-1.79.11 0 .37.03.53.17.14.12.18.29.2.42-.02.11.01.44 0 .68z"/></svg>
-        </button>
-        <button
-          class="MuiIconButton-root MuiIconButton-sizeMedium"
-          :title="i18n.t('settings.page.actions.github')"
-          @click="toGithubRepo"
-        >
-          <svg viewBox="0 0 24 24" fill="currentColor" width="1em" height="1em"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-        </button>
-      </div>
-    </template>
+  <div class="space-y-6 max-w-3xl">
+    <h1 class="text-2xl font-semibold">设置</h1>
 
-    <div class="MuiGrid-root MuiGrid-container" style="gap: 12px; display: flex; flex-wrap: wrap;">
-      <div class="MuiGrid-root MuiGrid-item" style="flex: 1; min-width: calc(50% - 12px);">
-        <div
-          class="setting-card"
+    <!-- General -->
+    <div class="card space-y-4">
+      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">通用设置</h2>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">主题模式</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">深色 / 浅色 / 跟随系统</div>
+        </div>
+        <select
+          v-model="themeMode"
+          class="rounded-lg px-3 py-1.5 text-sm outline-none border"
           :style="{
-            borderRadius: '16px',
-            marginBottom: '12px',
-            backgroundColor: isDark ? '#282a36' : '#ffffff',
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border)',
           }"
         >
-          <SettingSystem :onError="onError" />
-        </div>
-        <div
-          class="setting-card"
-          :style="{
-            borderRadius: '16px',
-            backgroundColor: isDark ? '#282a36' : '#ffffff',
-          }"
-        >
-          <SettingClash :onError="onError" />
-        </div>
+          <option value="dark">深色</option>
+          <option value="light">浅色</option>
+          <option value="auto">跟随系统</option>
+        </select>
       </div>
-      <div class="MuiGrid-root MuiGrid-item" style="flex: 1; min-width: calc(50% - 12px);">
-        <div
-          class="setting-card"
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">语言</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">界面语言</div>
+        </div>
+        <select
+          v-model="language"
+          class="rounded-lg px-3 py-1.5 text-sm outline-none border"
           :style="{
-            borderRadius: '16px',
-            marginBottom: '12px',
-            backgroundColor: isDark ? '#282a36' : '#ffffff',
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border)',
           }"
         >
-          <SettingVergeBasic :onError="onError" />
+          <option value="zh-CN">简体中文</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">开机自启</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">系统启动时自动运行</div>
         </div>
         <div
-          class="setting-card"
-          :style="{
-            borderRadius: '16px',
-            backgroundColor: isDark ? '#282a36' : '#ffffff',
-          }"
+          class="toggle"
+          :class="{ 'toggle-bg': true, active: startAtBoot }"
+          @click="startAtBoot = !startAtBoot"
         >
-          <SettingVergeAdvanced :onError="onError" />
+          <div class="toggle-knob"></div>
         </div>
       </div>
     </div>
-  </BasePage>
+
+    <!-- Proxy Settings -->
+    <div class="card space-y-4">
+      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">代理设置</h2>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">混合端口</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">HTTP/SOCKS5 混合代理端口</div>
+        </div>
+        <input
+          v-model.number="mixedPort"
+          type="number"
+          class="w-24 rounded-lg px-3 py-1.5 text-sm text-right outline-none border font-mono"
+          :style="{
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border)',
+          }"
+        />
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">API 端口</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">mihomo RESTful API 端口</div>
+        </div>
+        <input
+          v-model.number="apiPort"
+          type="number"
+          class="w-24 rounded-lg px-3 py-1.5 text-sm text-right outline-none border font-mono"
+          :style="{
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border)',
+          }"
+        />
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">允许局域网连接</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">允许局域网设备使用代理</div>
+        </div>
+        <div
+          class="toggle"
+          :class="{ 'toggle-bg': true, active: allowLan }"
+          @click="allowLan = !allowLan"
+        >
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">日志等级</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">核心日志输出级别</div>
+        </div>
+        <select
+          v-model="logLevel"
+          class="rounded-lg px-3 py-1.5 text-sm outline-none border"
+          :style="{
+            backgroundColor: 'var(--bg-tertiary)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border)',
+          }"
+        >
+          <option value="debug">Debug</option>
+          <option value="info">Info</option>
+          <option value="warning">Warning</option>
+          <option value="error">Error</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- System Proxy -->
+    <div class="card space-y-4">
+      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">系统代理</h2>
+
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Wifi :size="16" :style="{ color: 'var(--accent)' }" />
+          <div>
+            <div class="text-sm">系统代理</div>
+            <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">劫持系统 HTTP/HTTPS 流量</div>
+          </div>
+        </div>
+        <div
+          class="toggle"
+          :class="{ 'toggle-bg': true, active: systemProxy }"
+          @click="systemProxy = !systemProxy"
+        >
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <Monitor :size="16" :style="{ color: 'var(--orange)' }" />
+          <div>
+            <div class="text-sm">TUN 模式</div>
+            <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">虚拟网卡模式，接管所有流量</div>
+          </div>
+        </div>
+        <div
+          class="toggle"
+          :class="{ 'toggle-bg': true, active: tunMode }"
+          @click="tunMode = !tunMode"
+        >
+          <div class="toggle-knob"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core & Config -->
+    <div class="card space-y-4">
+      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">核心与配置</h2>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">核心路径</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">mihomo 核心可执行文件路径</div>
+        </div>
+        <button class="btn-ghost text-xs" @click="selectCorePath">
+          <FolderOpen :size="14" />
+          选择文件
+        </button>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <div>
+          <div class="text-sm">配置路径</div>
+          <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">配置文件目录</div>
+        </div>
+        <button class="btn-ghost text-xs" @click="selectConfigPath">
+          <FolderOpen :size="14" />
+          选择目录
+        </button>
+      </div>
+    </div>
+
+    <!-- Save -->
+    <div class="flex justify-end">
+      <button class="btn-primary" @click="saveConfig">
+        <RotateCw :size="14" />
+        保存设置
+      </button>
+    </div>
+  </div>
 </template>

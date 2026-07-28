@@ -1,101 +1,146 @@
-<template>
-  <BasePage
-    full
-    :content-style="{
-      height: '100%',
-      display: 'flex',
-      flexDirection: 'column',
-      overflow: 'auto',
-    }"
-  >
-    <template #title>
-      {{ t('rules.page.title') }}
-    </template>
-    <template #header>
-      <div style="display: flex; align-items: center; gap: 8px">
-        <ProviderButton />
-      </div>
-    </template>
-
-    <div
-      style="
-        padding-top: 8px;
-        margin-bottom: 4px;
-        margin-left: 10px;
-        margin-right: 10px;
-        height: 36px;
-        display: flex;
-        align-items: center;
-      "
-    >
-      <BaseSearchBox :on-search="handleSearch" />
-    </div>
-
-    <template v-if="filteredRules.length > 0">
-      <VirtualList
-        ref="virtuosoRef"
-        :count="filteredRules.length"
-        :estimate-size="40"
-        :style="{ flex: 1 }"
-        :on-scroll="handleScroll"
-      >
-        <template #item="{ index }">
-          <RuleItem :value="filteredRules[index]" />
-        </template>
-      </VirtualList>
-      <ScrollTopButton :on-click="scrollToTop" :show="showScrollTop" />
-    </template>
-    <BaseEmpty v-else />
-  </BasePage>
-</template>
-
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useTranslation } from '@/composables/use-i18n'
+import { ref, computed } from "vue";
+import { Search } from "lucide-vue-next";
 
-import { BaseEmpty, BasePage, BaseSearchBox, VirtualList } from '@/components/base'
-import ScrollTopButton from '@/components/layout/scroll-top-button.vue'
-import ProviderButton from '@/components/rule/provider-button.vue'
-import RuleItem from '@/components/rule/rule-item.vue'
-import { useVisibility } from '@/hooks/use-visibility'
-import { useAppRefreshers, useRulesData } from '@/providers/app-data-context'
+interface RuleEntry {
+  type: string;
+  payload: string;
+  proxy: string;
+  behavior: string;
+}
 
-const { t } = useTranslation()
-const { rules = [] } = useRulesData()
-const { refreshRules, refreshRuleProviders } = useAppRefreshers()
-const matchFunc = ref((_: string) => true)
-const virtuosoRef = ref<InstanceType<typeof VirtualList> | null>(null)
-const showScrollTop = ref(false)
-const pageVisible = useVisibility()
+const rules = ref<RuleEntry[]>([
+  { type: "DOMAIN-SUFFIX", payload: "google.com", proxy: "Proxy", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "youtube.com", proxy: "Proxy", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "twitter.com", proxy: "Proxy", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "github.com", proxy: "Direct", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "microsoft.com", proxy: "Direct", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "apple.com", proxy: "Direct", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "netflix.com", proxy: "Media", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "spotify.com", proxy: "Media", behavior: "Domain" },
+  { type: "DOMAIN-SUFFIX", payload: "openai.com", proxy: "Ai", behavior: "Domain" },
+  { type: "DOMAIN-KEYWORD", payload: "google", proxy: "Proxy", behavior: "Domain" },
+  { type: "DOMAIN-KEYWORD", payload: "facebook", proxy: "Proxy", behavior: "Domain" },
+  { type: "IP-CIDR", payload: "10.0.0.0/8", proxy: "Direct", behavior: "IPCIDR" },
+  { type: "IP-CIDR", payload: "172.16.0.0/12", proxy: "Direct", behavior: "IPCIDR" },
+  { type: "IP-CIDR", payload: "192.168.0.0/16", proxy: "Direct", behavior: "IPCIDR" },
+  { type: "IP-CIDR", payload: "127.0.0.0/8", proxy: "Direct", behavior: "IPCIDR" },
+  { type: "GEOIP", payload: "CN", proxy: "Direct", behavior: "IPCIDR" },
+  { type: "MATCH", payload: "MATCH", proxy: "Proxy", behavior: "Domain" },
+]);
 
-onMounted(() => {
-  refreshRules()
-  refreshRuleProviders()
-
-  if (pageVisible) {
-    refreshRules()
-    refreshRuleProviders()
-  }
-})
+const searchQuery = ref("");
 
 const filteredRules = computed(() => {
-  const rulesWithLineNo = rules.map((item: any, index: number) => ({
-    ...item,
-    lineNo: index + 1,
-  }))
+  if (!searchQuery.value) return rules.value;
+  const q = searchQuery.value.toLowerCase();
+  return rules.value.filter(
+    (r) =>
+      r.payload.toLowerCase().includes(q) ||
+      r.type.toLowerCase().includes(q) ||
+      r.proxy.toLowerCase().includes(q)
+  );
+});
 
-  return rulesWithLineNo.filter((item: any) => matchFunc.value(item.payload ?? ''))
-})
-
-const handleSearch = (match: (text: string) => boolean) => {
-  matchFunc.value = match
-}
-
-const handleScroll = (e: Event) => {
-  showScrollTop.value = (e.target as HTMLElement).scrollTop > 100
-}
-
-const scrollToTop = () => {
-  virtuosoRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+function proxyColor(proxy: string): string {
+  switch (proxy) {
+    case "Proxy":
+      return "var(--accent)";
+    case "Direct":
+      return "var(--green)";
+    case "Reject":
+      return "var(--red)";
+    case "Media":
+      return "var(--orange)";
+    case "Ai":
+      return "#bf5af2";
+    default:
+      return "var(--text-secondary)";
+  }
 }
 </script>
+
+<template>
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">规则</h1>
+      <span class="text-sm" :style="{ color: 'var(--text-secondary)' }">
+        共 {{ rules.length }} 条规则
+      </span>
+    </div>
+
+    <!-- Search -->
+    <div
+      class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm max-w-xs"
+      :style="{ backgroundColor: 'var(--bg-tertiary)' }"
+    >
+      <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
+      <input
+        v-model="searchQuery"
+        placeholder="搜索规则..."
+        class="bg-transparent outline-none flex-1 text-sm"
+        :style="{ color: 'var(--text-primary)' }"
+      />
+    </div>
+
+    <!-- Rules table -->
+    <div class="rounded-xl overflow-hidden border" :style="{ borderColor: 'var(--border)' }">
+      <!-- Header -->
+      <div
+        class="grid grid-cols-4 gap-2 px-4 py-2.5 text-xs font-medium"
+        :style="{
+          backgroundColor: 'var(--bg-secondary)',
+          color: 'var(--text-secondary)',
+          borderBottom: '1px solid var(--border)',
+        }"
+      >
+        <div>类型</div>
+        <div>内容</div>
+        <div>行为</div>
+        <div>代理</div>
+      </div>
+
+      <!-- Body -->
+      <div
+        class="divide-y max-h-[calc(100vh-280px)] overflow-y-auto"
+        :style="{ borderColor: 'var(--border)' }"
+      >
+        <div
+          v-for="(rule, i) in filteredRules"
+          :key="i"
+          class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center transition-colors"
+          :style="{ borderColor: 'var(--border)' }"
+          @mouseenter="(e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-hover)'"
+          @mouseleave="(e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
+        >
+          <div>
+            <span
+              class="text-xs px-1.5 py-0.5 rounded"
+              :style="{
+                backgroundColor: 'rgba(79,142,247,0.1)',
+                color: 'var(--accent)',
+              }"
+            >
+              {{ rule.type }}
+            </span>
+          </div>
+          <div class="font-mono text-xs" :style="{ color: 'var(--text-primary)' }">
+            {{ rule.payload }}
+          </div>
+          <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">
+            {{ rule.behavior }}
+          </div>
+          <div>
+            <span
+              class="text-xs font-medium"
+              :style="{ color: proxyColor(rule.proxy) }"
+            >
+              {{ rule.proxy }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

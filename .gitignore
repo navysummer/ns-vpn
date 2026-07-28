@@ -19,3 +19,6 @@ CLAUDE.md
 .claude
 AGENTS.md
 .zed
+
+# hex-named cargo artifact dirs
+[0-9a-f]*/

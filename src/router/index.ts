@@ -1,23 +1,26 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory } from "vue-router";
+import Dashboard from "@/pages/Dashboard.vue";
+import Proxies from "@/pages/Proxies.vue";
+import Connections from "@/pages/Connections.vue";
+import Rules from "@/pages/Rules.vue";
+import Logs from "@/pages/Logs.vue";
+import Profiles from "@/pages/Profiles.vue";
+import Settings from "@/pages/Settings.vue";
+
+const routes = [
+  { path: "/", redirect: "/dashboard" },
+  { path: "/dashboard", name: "Dashboard", component: Dashboard },
+  { path: "/proxies", name: "Proxies", component: Proxies },
+  { path: "/connections", name: "Connections", component: Connections },
+  { path: "/rules", name: "Rules", component: Rules },
+  { path: "/logs", name: "Logs", component: Logs },
+  { path: "/profiles", name: "Profiles", component: Profiles },
+  { path: "/settings", name: "Settings", component: Settings },
+];
 
 const router = createRouter({
   history: createWebHistory(),
-  routes: [
-    {
-      path: '/',
-      component: () => import('@/pages/_layout.vue'),
-      children: [
-        { path: '', name: 'home', component: () => import('@/pages/home.vue') },
-        { path: 'proxies', name: 'proxies', component: () => import('@/pages/proxies.vue') },
-        { path: 'profile', name: 'profile', component: () => import('@/pages/profiles.vue') },
-        { path: 'connections', name: 'connections', component: () => import('@/pages/connections.vue') },
-        { path: 'rules', name: 'rules', component: () => import('@/pages/rules.vue') },
-        { path: 'logs', name: 'logs', component: () => import('@/pages/logs.vue') },
-        { path: 'unlock', name: 'unlock', component: () => import('@/pages/unlock.vue') },
-        { path: 'settings', name: 'settings', component: () => import('@/pages/settings.vue') },
-      ],
-    },
-  ],
-})
+  routes,
+});
 
-export { router }
+export default router;
