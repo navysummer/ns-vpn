@@ -1,6 +1,11 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { FolderOpen, RotateCw, Download, Wifi, Monitor, Globe } from "lucide-vue-next";
+import { ref, computed } from "vue";
+import { FolderOpen, RotateCw } from "lucide-vue-next";
+import { useAppStore } from "@/stores/app";
+import { useToast } from "@/utils/toast";
+
+const app = useAppStore();
+const { show } = useToast();
 
 const mixedPort = ref(7890);
 const apiPort = ref(9090);
@@ -9,21 +14,25 @@ const logLevel = ref("info");
 const systemProxy = ref(false);
 const tunMode = ref(false);
 const startAtBoot = ref(false);
-const autoUpdate = ref(false);
-const themeMode = ref("dark");
+const themeMode = ref(app.theme);
 const language = ref("zh-CN");
+const saving = ref(false);
 
 function saveConfig() {
-  // In a real app, this would call Tauri commands
-  console.log("Config saved");
+  saving.value = true;
+  app.setTheme(themeMode.value as "dark" | "light" | "auto");
+  setTimeout(() => {
+    saving.value = false;
+    show("设置已保存", "success");
+  }, 400);
 }
 
 function selectCorePath() {
-  // Would use Tauri dialog
+  show("文件选择器将在 Tauri 环境中生效", "info");
 }
 
 function selectConfigPath() {
-  // Would use Tauri dialog
+  show("目录选择器将在 Tauri 环境中生效", "info");
 }
 </script>
 
@@ -31,9 +40,8 @@ function selectConfigPath() {
   <div class="space-y-6 max-w-3xl">
     <h1 class="text-2xl font-semibold">设置</h1>
 
-    <!-- General -->
     <div class="card space-y-4">
-      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">通用设置</h2>
+      <h2 class="text-sm font-medium">通用设置</h2>
 
       <div class="flex items-center justify-between">
         <div>
@@ -81,7 +89,7 @@ function selectConfigPath() {
         </div>
         <div
           class="toggle"
-          :class="{ 'toggle-bg': true, active: startAtBoot }"
+          :class="{ active: startAtBoot }"
           @click="startAtBoot = !startAtBoot"
         >
           <div class="toggle-knob"></div>
@@ -89,9 +97,8 @@ function selectConfigPath() {
       </div>
     </div>
 
-    <!-- Proxy Settings -->
     <div class="card space-y-4">
-      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">代理设置</h2>
+      <h2 class="text-sm font-medium">代理设置</h2>
 
       <div class="flex items-center justify-between">
         <div>
@@ -134,7 +141,7 @@ function selectConfigPath() {
         </div>
         <div
           class="toggle"
-          :class="{ 'toggle-bg': true, active: allowLan }"
+          :class="{ active: allowLan }"
           @click="allowLan = !allowLan"
         >
           <div class="toggle-knob"></div>
@@ -163,13 +170,17 @@ function selectConfigPath() {
       </div>
     </div>
 
-    <!-- System Proxy -->
     <div class="card space-y-4">
-      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">系统代理</h2>
+      <h2 class="text-sm font-medium">系统代理</h2>
 
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <Wifi :size="16" :style="{ color: 'var(--accent)' }" />
+          <div
+            class="w-8 h-8 rounded-lg flex items-center justify-center"
+            :style="{ backgroundColor: 'rgba(79,142,247,0.15)' }"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h6a2 2 0 0 1 2 2"/><path d="M5 19h14a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H9a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2Z"/></svg>
+          </div>
           <div>
             <div class="text-sm">系统代理</div>
             <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">劫持系统 HTTP/HTTPS 流量</div>
@@ -177,7 +188,7 @@ function selectConfigPath() {
         </div>
         <div
           class="toggle"
-          :class="{ 'toggle-bg': true, active: systemProxy }"
+          :class="{ active: systemProxy }"
           @click="systemProxy = !systemProxy"
         >
           <div class="toggle-knob"></div>
@@ -186,7 +197,12 @@ function selectConfigPath() {
 
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
-          <Monitor :size="16" :style="{ color: 'var(--orange)' }" />
+          <div
+            class="w-8 h-8 rounded-lg flex items-center justify-center"
+            :style="{ backgroundColor: 'rgba(255,159,10,0.15)' }"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--orange)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 8v8"/><path d="M15 8v8"/><path d="M9 12h6"/></svg>
+          </div>
           <div>
             <div class="text-sm">TUN 模式</div>
             <div class="text-xs mt-0.5" :style="{ color: 'var(--text-secondary)' }">虚拟网卡模式，接管所有流量</div>
@@ -194,7 +210,7 @@ function selectConfigPath() {
         </div>
         <div
           class="toggle"
-          :class="{ 'toggle-bg': true, active: tunMode }"
+          :class="{ active: tunMode }"
           @click="tunMode = !tunMode"
         >
           <div class="toggle-knob"></div>
@@ -202,9 +218,8 @@ function selectConfigPath() {
       </div>
     </div>
 
-    <!-- Core & Config -->
     <div class="card space-y-4">
-      <h2 class="text-sm font-medium" :style="{ color: 'var(--text-primary)' }">核心与配置</h2>
+      <h2 class="text-sm font-medium">核心与配置</h2>
 
       <div class="flex items-center justify-between">
         <div>
@@ -229,11 +244,11 @@ function selectConfigPath() {
       </div>
     </div>
 
-    <!-- Save -->
     <div class="flex justify-end">
-      <button class="btn-primary" @click="saveConfig">
-        <RotateCw :size="14" />
-        保存设置
+      <button class="btn-primary" :disabled="saving" @click="saveConfig">
+        <RotateCw v-if="saving" :size="14" class="spin" />
+        <RotateCw v-else :size="14" />
+        {{ saving ? "保存中..." : "保存设置" }}
       </button>
     </div>
   </div>

@@ -2,6 +2,7 @@
 import { watch } from "vue";
 import { useAppStore } from "@/stores/app";
 import Sidebar from "@/components/Sidebar.vue";
+import ToastContainer from "@/components/ToastContainer.vue";
 
 const app = useAppStore();
 
@@ -28,7 +29,12 @@ watch(
   >
     <Sidebar />
     <main class="flex-1 overflow-y-auto p-6 lg:p-8">
-      <router-view />
+      <router-view v-slot="{ Component }">
+        <transition name="page" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
     </main>
+    <ToastContainer />
   </div>
 </template>

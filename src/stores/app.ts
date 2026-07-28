@@ -5,6 +5,8 @@ export const useAppStore = defineStore("app", () => {
   const theme = ref<"dark" | "light" | "auto">("dark");
   const sidebarCollapsed = ref(false);
   const proxyRunning = ref(false);
+  const systemProxy = ref(false);
+  const tunMode = ref(false);
 
   const isDark = computed(() => {
     if (theme.value === "auto") {
@@ -31,14 +33,26 @@ export const useAppStore = defineStore("app", () => {
     proxyRunning.value = running;
   }
 
+  function setSystemProxy(on: boolean) {
+    systemProxy.value = on;
+  }
+
+  function setTunMode(on: boolean) {
+    tunMode.value = on;
+  }
+
   return {
     theme,
     sidebarCollapsed,
     proxyRunning,
+    systemProxy,
+    tunMode,
     isDark,
     toggleTheme,
     setTheme,
     toggleSidebar,
     setProxyRunning,
+    setSystemProxy,
+    setTunMode,
   };
 });

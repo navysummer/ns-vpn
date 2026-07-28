@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from "vue";
-import { Terminal } from "lucide-vue-next";
+import { Terminal, Download } from "lucide-vue-next";
 
 interface LogEntry {
   time: string;
@@ -60,27 +60,68 @@ watch(
 function clearLogs() {
   logs.value = [];
 }
+
+function levelColor(level: string): string {
+  switch (level) {
+    case "error": return "var(--red)";
+    case "warning": return "var(--orange)";
+    default: return "var(--text-secondary)";
+  }
+}
+
+function levelBadge(level: string): string {
+  switch (level) {
+    case "error": return "ERROR";
+    case "warning": return "WARN";
+    default: return "INFO";
+  }
+}
+
+function typeColor(type: string): string {
+  switch (type) {
+    case "INIT": return "#34c759";
+    case "PROXY": return "#4f8ef7";
+    case "DNS": return "#bf5af2";
+    case "TUN": return "#ff9f0a";
+    case "HTTP": return "#ff453a";
+    default: return "var(--text-secondary)";
+  }
+}
+
+function exportLogs() {
+  const text = filteredLogs.value
+    .map(l => `[${l.time}] ${levelBadge(l.level)} [${l.type}] ${l.payload}`)
+    .join("\n");
+  const blob = new Blob([text], { type: "text/plain" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ns-vpn-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header -->
+  <div class="space-y-4">
     <div class="flex items-center justify-between">
       <h1 class="text-2xl font-semibold">日志</h1>
-      <button class="btn-ghost text-xs" @click="clearLogs">清空</button>
+      <div class="flex items-center gap-2">
+        <button class="btn-ghost text-xs" @click="exportLogs">
+          <Download :size="12" />
+          导出
+        </button>
+        <button class="btn-ghost text-xs" @click="clearLogs">清空</button>
+      </div>
     </div>
 
-    <!-- Controls -->
     <div class="flex items-center gap-3">
       <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
         <button
           v-for="opt in ([{ label: '全部', value: 'all' }, { label: '信息', value: 'info' }, { label: '警告', value: 'warning' }, { label: '错误', value: 'error' }] as const)"
           :key="opt.value"
-          class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
-          :style="{
-            backgroundColor: logLevel === opt.value ? 'var(--accent)' : 'transparent',
-            color: logLevel === opt.value ? '#fff' : 'var(--text-secondary)',
-          }"
+          class="tab-btn"
+          :class="logLevel === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'"
           @click="logLevel = opt.value"
         >
           {{ opt.label }}
@@ -90,7 +131,7 @@ function clearLogs() {
       <label class="flex items-center gap-2 text-sm cursor-pointer" :style="{ color: 'var(--text-secondary)' }">
         <div
           class="toggle"
-          :class="{ 'toggle-bg': true, active: autoScroll }"
+          :class="{ active: autoScroll }"
           @click="autoScroll = !autoScroll"
         >
           <div class="toggle-knob"></div>
@@ -99,14 +140,13 @@ function clearLogs() {
       </label>
     </div>
 
-    <!-- Log output -->
     <div
       ref="logContainer"
       class="rounded-xl border overflow-y-auto font-mono text-xs leading-relaxed"
       :style="{
         backgroundColor: 'var(--bg-secondary)',
         borderColor: 'var(--border)',
-        height: 'calc(100vh - 260px)',
+        height: 'calc(100vh - 240px)',
         color: 'var(--text-primary)',
       }"
     >
@@ -114,28 +154,16 @@ function clearLogs() {
         <div
           v-for="(log, i) in filteredLogs"
           :key="i"
-          class="flex gap-3 py-0.5 hover:opacity-80"
+          class="log-line hover:opacity-80"
         >
-          <span class="shrink-0" :style="{ color: 'var(--text-secondary)' }">[{{ log.time }}]</span>
-          <span
-            class="shrink-0"
-            :style="{
-              color: log.level === 'error'
-                ? 'var(--red)'
-                : log.level === 'warning'
-                ? 'var(--orange)'
-                : 'var(--text-secondary)',
-            }"
-          >
-            {{ log.level.toUpperCase() }}
+          <span class="log-time">[{{ log.time }}]</span>
+          <span class="log-level" :style="{ color: levelColor(log.level) }">
+            {{ levelBadge(log.level).padEnd(5) }}
           </span>
-          <span
-            class="shrink-0"
-            :style="{ color: 'var(--accent)' }"
-          >
+          <span class="log-type" :style="{ color: typeColor(log.type) }">
             [{{ log.type }}]
           </span>
-          <span>{{ log.payload }}</span>
+          <span class="log-payload">{{ log.payload }}</span>
         </div>
         <div v-if="filteredLogs.length === 0" class="py-8 text-center" :style="{ color: 'var(--text-secondary)' }">
           <Terminal :size="24" class="mx-auto mb-2 opacity-30" />
@@ -145,3 +173,28 @@ function clearLogs() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.log-line {
+  display: flex;
+  gap: 8px;
+  padding: 1px 0;
+}
+.log-time {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+.log-level {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.log-type {
+  flex-shrink: 0;
+}
+.log-payload {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+</style>

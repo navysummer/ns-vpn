@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { X, ArrowUp, ArrowDown, Search } from "lucide-vue-next";
-import { formatBytes, formatTime } from "@/utils/format";
+import { X, Search, ChevronRight } from "lucide-vue-next";
+import { formatBytes } from "@/utils/format";
 
 interface Connection {
   id: string;
@@ -15,6 +15,8 @@ interface Connection {
   download: number;
   start: number;
   alive: number;
+  sourceIP: string;
+  destinationIP: string;
 }
 
 const connections = ref<Connection[]>(
@@ -30,11 +32,14 @@ const connections = ref<Connection[]>(
     download: Math.floor(Math.random() * 1000000),
     start: Date.now() - Math.floor(Math.random() * 600000),
     alive: Math.floor(Math.random() * 300),
+    sourceIP: `192.168.1.${Math.floor(Math.random() * 255)}`,
+    destinationIP: `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
   }))
 );
 
 const searchQuery = ref("");
 const filterNetwork = ref<"all" | "tcp" | "udp">("all");
+const selectedConnection = ref<Connection | null>(null);
 
 const filteredConnections = computed(() => {
   return connections.value.filter((c) => {
@@ -46,135 +51,300 @@ const filteredConnections = computed(() => {
 
 function closeConnection(id: string) {
   connections.value = connections.value.filter((c) => c.id !== id);
+  if (selectedConnection.value?.id === id) {
+    selectedConnection.value = null;
+  }
 }
 
 function closeAll() {
   connections.value = [];
+  selectedConnection.value = null;
+}
+
+function selectConnection(conn: Connection) {
+  selectedConnection.value = selectedConnection.value?.id === conn.id ? null : conn;
+}
+
+function ruleColor(rule: string): string {
+  switch (rule) {
+    case "Direct": return "var(--green)";
+    case "Reject": return "var(--red)";
+    case "Media": return "var(--orange)";
+    default: return "var(--accent)";
+  }
+}
+
+function formatAlive(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  return `${Math.floor(seconds / 3600)}h`;
 }
 </script>
 
 <template>
-  <div class="space-y-6">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-semibold">连接</h1>
-      <div class="flex items-center gap-2">
-        <span class="text-sm" :style="{ color: 'var(--text-secondary)' }">
-          {{ connections.length }} 个活跃连接
-        </span>
-        <button class="btn-ghost text-xs" @click="closeAll">关闭全部</button>
+  <div class="flex gap-4 h-[calc(100vh-60px)]">
+    <div class="flex-1 space-y-4 min-w-0">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-semibold">连接</h1>
+        <div class="flex items-center gap-2">
+          <span class="text-sm" :style="{ color: 'var(--text-secondary)' }">
+            {{ connections.length }} 个活跃连接
+          </span>
+          <button class="btn-ghost text-xs" @click="closeAll">关闭全部</button>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div
+          class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs"
+          :style="{ backgroundColor: 'var(--bg-tertiary)' }"
+        >
+          <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
+          <input
+            v-model="searchQuery"
+            placeholder="搜索主机..."
+            class="bg-transparent outline-none flex-1 text-sm"
+            :style="{ color: 'var(--text-primary)' }"
+          />
+        </div>
+        <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
+          <button
+            v-for="opt in ([{ label: '全部', value: 'all' }, { label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp' }] as const)"
+            :key="opt.value"
+            class="tab-btn"
+            :class="filterNetwork === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'"
+            @click="filterNetwork = opt.value"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="rounded-xl overflow-hidden border flex-1 flex flex-col" :style="{ borderColor: 'var(--border)' }">
+        <div
+          class="grid grid-cols-8 gap-2 px-4 py-2.5 text-xs font-medium shrink-0"
+          :style="{
+            backgroundColor: 'var(--bg-secondary)',
+            color: 'var(--text-secondary)',
+            borderBottom: '1px solid var(--border)',
+          }"
+        >
+          <div class="col-span-2">主机</div>
+          <div>网络</div>
+          <div>类型</div>
+          <div>规则</div>
+          <div>存活</div>
+          <div class="text-right">上传</div>
+          <div class="text-right">下载</div>
+        </div>
+
+        <div
+          class="divide-y flex-1 overflow-y-auto"
+          :style="{ borderColor: 'var(--border)' }"
+        >
+          <div
+            v-for="conn in filteredConnections"
+            :key="conn.id"
+            class="conn-row"
+            :class="{
+              'conn-row-active': selectedConnection?.id === conn.id,
+            }"
+            @click="selectConnection(conn)"
+          >
+            <div class="col-span-2 flex items-center gap-2">
+              <span class="truncate text-xs font-mono">{{ conn.host }}:{{ conn.port }}</span>
+              <button
+                class="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                :style="{ color: 'var(--red)' }"
+                @click.stop="closeConnection(conn.id)"
+              >
+                <X :size="10" />
+              </button>
+            </div>
+            <div>
+              <span
+                class="tag"
+                :style="{
+                  backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)',
+                  color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)',
+                }"
+              >
+                {{ conn.network.toUpperCase() }}
+              </span>
+            </div>
+            <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }}</div>
+            <div>
+              <span class="text-xs font-medium" :style="{ color: ruleColor(conn.rule) }">
+                {{ conn.rule }}
+              </span>
+            </div>
+            <div class="text-xs mono" :style="{ color: 'var(--text-secondary)' }">
+              {{ formatAlive(conn.alive) }}
+            </div>
+            <div class="text-right font-mono text-xs" :style="{ color: 'var(--orange)' }">
+              {{ formatBytes(conn.upload) }}
+            </div>
+            <div class="text-right font-mono text-xs" :style="{ color: 'var(--accent)' }">
+              {{ formatBytes(conn.download) }}
+            </div>
+          </div>
+
+          <div
+            v-if="filteredConnections.length === 0"
+            class="px-4 py-12 text-center text-sm"
+            :style="{ color: 'var(--text-secondary)' }"
+          >
+            暂无连接
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="flex items-center gap-3">
+    <Transition name="page">
       <div
-        class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs"
-        :style="{ backgroundColor: 'var(--bg-tertiary)' }"
+        v-if="selectedConnection"
+        class="detail-panel"
       >
-        <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
-        <input
-          v-model="searchQuery"
-          placeholder="搜索主机..."
-          class="bg-transparent outline-none flex-1 text-sm"
-          :style="{ color: 'var(--text-primary)' }"
-        />
-      </div>
-      <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-sm font-medium">连接详情</h3>
+          <button
+            class="p-1 rounded hover:opacity-80"
+            :style="{ color: 'var(--text-secondary)' }"
+            @click="selectedConnection = null"
+          >
+            <X :size="14" />
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <div class="detail-row">
+            <span class="detail-label">主机</span>
+            <span class="detail-value mono">{{ selectedConnection.host }}:{{ selectedConnection.port }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">网络</span>
+            <span class="tag"
+              :style="{
+                backgroundColor: selectedConnection.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)',
+                color: selectedConnection.network === 'tcp' ? 'var(--accent)' : 'var(--green)',
+              }"
+            >
+              {{ selectedConnection.network.toUpperCase() }}
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">类型</span>
+            <span class="detail-value">{{ selectedConnection.type }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">规则</span>
+            <span class="detail-value" :style="{ color: ruleColor(selectedConnection.rule) }">
+              {{ selectedConnection.rule }}
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">链路</span>
+            <div class="flex items-center gap-1">
+              <span
+                v-for="(chain, i) in selectedConnection.chains"
+                :key="i"
+                class="text-xs"
+              >
+                <span :style="{ color: 'var(--accent)' }">{{ chain }}</span>
+                <ChevronRight v-if="i < selectedConnection.chains.length - 1" :size="10" class="inline" :style="{ color: 'var(--text-secondary)' }" />
+              </span>
+            </div>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">来源</span>
+            <span class="detail-value mono text-xs">{{ selectedConnection.sourceIP }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">目标</span>
+            <span class="detail-value mono text-xs">{{ selectedConnection.destinationIP }}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">上传</span>
+            <span class="detail-value mono" :style="{ color: 'var(--orange)' }">
+              {{ formatBytes(selectedConnection.upload) }}
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">下载</span>
+            <span class="detail-value mono" :style="{ color: 'var(--accent)' }">
+              {{ formatBytes(selectedConnection.download) }}
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-label">存活</span>
+            <span class="detail-value mono">{{ formatAlive(selectedConnection.alive) }}</span>
+          </div>
+        </div>
+
         <button
-          v-for="opt in ([{ label: '全部', value: 'all' }, { label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp' }] as const)"
-          :key="opt.value"
-          class="px-3 py-1 rounded-md text-xs font-medium transition-colors"
-          :style="{
-            backgroundColor: filterNetwork === opt.value ? 'var(--accent)' : 'transparent',
-            color: filterNetwork === opt.value ? '#fff' : 'var(--text-secondary)',
-          }"
-          @click="filterNetwork = opt.value"
+          class="btn-ghost text-xs w-full mt-4 justify-center"
+          :style="{ color: 'var(--red)' }"
+          @click="closeConnection(selectedConnection.id)"
         >
-          {{ opt.label }}
+          <X :size="12" />
+          关闭此连接
         </button>
       </div>
-    </div>
-
-    <!-- Table -->
-    <div class="rounded-xl overflow-hidden border" :style="{ borderColor: 'var(--border)' }">
-      <!-- Table header -->
-      <div
-        class="grid grid-cols-7 gap-2 px-4 py-2.5 text-xs font-medium"
-        :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }"
-      >
-        <div class="col-span-2">主机</div>
-        <div>网络</div>
-        <div>类型</div>
-        <div>规则</div>
-        <div class="text-right">上传</div>
-        <div class="text-right">下载</div>
-      </div>
-
-      <!-- Table body -->
-      <div
-        class="divide-y max-h-[calc(100vh-320px)] overflow-y-auto"
-        :style="{ borderColor: 'var(--border)' }"
-      >
-        <div
-          v-for="conn in filteredConnections"
-          :key="conn.id"
-          class="grid grid-cols-7 gap-2 px-4 py-2.5 text-sm items-center transition-colors duration-150 group"
-          :style="{
-            borderColor: 'var(--border)',
-          }"
-          @mouseenter="(e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-hover)'"
-          @mouseleave="(e) => (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'"
-        >
-          <div class="col-span-2 flex items-center gap-2">
-            <span class="truncate">{{ conn.host }}:{{ conn.port }}</span>
-            <button
-              class="opacity-0 group-hover:opacity-100 transition-opacity"
-              :style="{ color: 'var(--red)' }"
-              @click="closeConnection(conn.id)"
-            >
-              <X :size="12" />
-            </button>
-          </div>
-          <div>
-            <span
-              class="text-xs px-1.5 py-0.5 rounded"
-              :style="{
-                backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.15)' : 'rgba(52,199,89,0.15)',
-                color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)',
-              }"
-            >
-              {{ conn.network.toUpperCase() }}
-            </span>
-          </div>
-          <div :style="{ color: 'var(--text-secondary)' }">{{ conn.type }}</div>
-          <div>
-            <span
-              class="text-xs"
-              :style="{
-                color: conn.rule === 'Direct' ? 'var(--green)' : conn.rule === 'Reject' ? 'var(--red)' : 'var(--accent)',
-              }"
-            >
-              {{ conn.rule }}
-            </span>
-          </div>
-          <div class="text-right font-mono text-xs" :style="{ color: 'var(--orange)' }">
-            {{ formatBytes(conn.upload) }}
-          </div>
-          <div class="text-right font-mono text-xs" :style="{ color: 'var(--accent)' }">
-            {{ formatBytes(conn.download) }}
-          </div>
-        </div>
-
-        <!-- Empty state -->
-        <div
-          v-if="filteredConnections.length === 0"
-          class="px-4 py-12 text-center text-sm"
-          :style="{ color: 'var(--text-secondary)' }"
-        >
-          暂无连接
-        </div>
-      </div>
-    </div>
+    </Transition>
   </div>
 </template>
+
+<style scoped>
+.conn-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 0.5fr 0.5fr 0.5fr;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  align-items: center;
+  transition: background-color 100ms ease;
+  cursor: pointer;
+}
+.conn-row:hover {
+  background-color: var(--bg-hover);
+}
+.conn-row-active {
+  background-color: rgba(79,142,247,0.08) !important;
+}
+
+.detail-panel {
+  width: 280px;
+  min-width: 280px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  height: fit-content;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.detail-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.detail-value {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+</style>
