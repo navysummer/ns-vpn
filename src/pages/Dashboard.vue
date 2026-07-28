@@ -1,206 +1,248 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import { ArrowUp, ArrowDown, Activity, Cpu } from "lucide-vue-next";
-import { formatBytes, formatSpeed } from "@/utils/format";
-import BasePage from "@/components/BasePage.vue";
-import EnhancedCard from "@/components/EnhancedCard.vue";
-import ClashInfoCard from "@/components/home/ClashInfoCard.vue";
-import SystemInfoCard from "@/components/home/SystemInfoCard.vue";
+import { ref, onMounted } from "vue";
+import { useToast } from "@/utils/toast";
+import SubscriptionCard from "@/components/home/SubscriptionCard.vue";
+import CurrentNodeCard from "@/components/home/CurrentNodeCard.vue";
+import NetworkSettingsCard from "@/components/home/NetworkSettingsCard.vue";
+import TrafficStatsCard from "@/components/home/TrafficStatsCard.vue";
+import WebsiteTestCard from "@/components/home/WebsiteTestCard.vue";
 import IpInfoCard from "@/components/home/IpInfoCard.vue";
-import CurrentProxyCard from "@/components/home/CurrentProxyCard.vue";
 
-const uploadSpeed = ref(0);
-const downloadSpeed = ref(0);
-const uploadTotal = ref(0);
-const downloadTotal = ref(0);
-const activeConnections = ref(0);
-const memoryUsage = ref(0);
-const coreRunning = ref(false);
+const { show } = useToast();
 const loading = ref(true);
+const proxyMode = ref<"rule" | "global" | "direct">("global");
 
-const speedHistory = ref<{ up: number; down: number }[]>([]);
-const maxHistory = 60;
-
-let interval: ReturnType<typeof setInterval> | null = null;
-
-function updateTraffic() {
-  const up = Math.random() * 50000;
-  const down = Math.random() * 500000;
-  uploadSpeed.value = up;
-  downloadSpeed.value = down;
-  uploadTotal.value += up * 0.1;
-  downloadTotal.value += down * 0.1;
-  activeConnections.value = Math.floor(Math.random() * 50) + 5;
-  memoryUsage.value = Math.floor(Math.random() * 80) + 20;
-  coreRunning.value = true;
-
-  speedHistory.value.push({ up, down });
-  if (speedHistory.value.length > maxHistory) {
-    speedHistory.value.shift();
-  }
-}
-
-const chartPath = (type: "up" | "down") => {
-  if (speedHistory.value.length < 2) return "";
-  const w = 200;
-  const h = 50;
-  const maxVal = Math.max(...speedHistory.value.map((s) => Math.max(s.up, s.down)), 1);
-  const points = speedHistory.value.map((s, i) => {
-    const x = (i / (speedHistory.value.length - 1)) * w;
-    const y = h - ((type === "up" ? s.up : s.down) / maxVal) * h * 0.9;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  return points.join(" ");
+const modeDescriptions: Record<string, string> = {
+  rule: "根据规则进行分流，推荐大部分用户使用",
+  global: "所有流量均通过代理服务器，适用于需要全局科学上网的场景",
+  direct: "所有流量直连，不使用代理服务器",
 };
+
+function setProxyMode(mode: "rule" | "global" | "direct") {
+  proxyMode.value = mode;
+  const labels = { rule: "规则", global: "全局", direct: "直连" };
+  show(`已切换到${labels[mode]}模式`, "info");
+}
 
 onMounted(() => {
   setTimeout(() => { loading.value = false; }, 300);
-  updateTraffic();
-  interval = setInterval(updateTraffic, 2000);
-});
-
-onUnmounted(() => {
-  if (interval) clearInterval(interval);
 });
 </script>
 
 <template>
-  <BasePage title="仪表盘">
-    <template #actions>
-      <div class="flex items-center gap-2 text-sm" :style="{ color: coreRunning ? 'var(--green)' : 'var(--text-secondary)' }">
-        <span class="w-2 h-2 rounded-full pulse-dot" :style="{ backgroundColor: 'currentColor' }"></span>
-        {{ coreRunning ? "核心运行中" : "核心未启动" }}
-      </div>
-    </template>
+  <div class="dashboard-page">
+    <div class="dashboard-header">
+      <h1 class="dashboard-title">首页</h1>
+    </div>
 
     <div v-if="loading" class="flex items-center justify-center py-20" :style="{ color: 'var(--text-secondary)' }">
-      <div class="spin"><Activity :size="24" /></div>
+      <div class="spin">加载中...</div>
     </div>
 
     <template v-else>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="stat-card">
-          <div class="stat-icon" :style="{ backgroundColor: 'rgba(79,142,247,0.12)' }">
-            <ArrowDown :size="18" :style="{ color: 'var(--accent)' }" />
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">下载速度</div>
-            <div class="stat-value mono" :style="{ color: 'var(--accent)' }">{{ formatSpeed(downloadSpeed) }}</div>
-          </div>
+      <div class="dashboard-grid">
+        <div class="grid-top">
+          <SubscriptionCard />
+          <CurrentNodeCard />
         </div>
 
-        <div class="stat-card">
-          <div class="stat-icon" :style="{ backgroundColor: 'rgba(255,159,10,0.12)' }">
-            <ArrowUp :size="18" :style="{ color: 'var(--orange)' }" />
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">上传速度</div>
-            <div class="stat-value mono" :style="{ color: 'var(--orange)' }">{{ formatSpeed(uploadSpeed) }}</div>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon" :style="{ backgroundColor: 'rgba(52,199,89,0.12)' }">
-            <Activity :size="18" :style="{ color: 'var(--green)' }" />
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">活跃连接</div>
-            <div class="stat-value mono" :style="{ color: 'var(--green)' }">{{ activeConnections }}</div>
-          </div>
-        </div>
-
-        <div class="stat-card">
-          <div class="stat-icon" :style="{ backgroundColor: 'rgba(191,90,242,0.12)' }">
-            <Cpu :size="18" :style="{ color: '#bf5af2' }" />
-          </div>
-          <div class="stat-body">
-            <div class="stat-label">内存占用</div>
-            <div class="stat-value mono">{{ memoryUsage }} MB</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <div class="lg:col-span-2">
-          <EnhancedCard title="实时流量" :icon="Activity" icon-color="var(--accent)">
-            <template #action>
-              <div class="flex items-center gap-3 text-xs">
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" :style="{ backgroundColor: 'var(--accent)' }"></span>下载</span>
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full" :style="{ backgroundColor: 'var(--orange)' }"></span>上传</span>
+        <div class="grid-middle">
+          <NetworkSettingsCard />
+          <div class="proxy-mode-card">
+            <div class="pmc-header">
+              <div class="pmc-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></svg>
               </div>
-            </template>
-            <div class="h-36">
-              <svg v-if="speedHistory.length > 1" viewBox="0 0 200 50" class="w-full h-full" preserveAspectRatio="none">
-                <polyline :points="chartPath('down')" fill="none" stroke="var(--accent)" stroke-width="1" stroke-linecap="round" opacity="0.8" />
-                <polyline :points="chartPath('up')" fill="none" stroke="var(--orange)" stroke-width="1" stroke-linecap="round" opacity="0.6" />
-              </svg>
-              <div v-else class="h-full flex items-center justify-center" :style="{ color: 'var(--text-secondary)' }">
-                <span class="text-sm">等待流量数据...</span>
+              <span class="pmc-title">代理模式</span>
+            </div>
+            <div class="pmc-body">
+              <div class="pmc-modes">
+                <button
+                  class="pmc-mode-btn"
+                  :class="{ 'pmc-mode-active': proxyMode === 'rule' }"
+                  @click="setProxyMode('rule')"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                  <div>
+                    <div class="pmc-mode-label">规则</div>
+                    <div class="pmc-mode-desc">按规则分流</div>
+                  </div>
+                </button>
+                <button
+                  class="pmc-mode-btn"
+                  :class="{ 'pmc-mode-active': proxyMode === 'global' }"
+                  @click="setProxyMode('global')"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m2 12 10 10 10-10"/><path d="m2 12 10-10 10 10"/></svg>
+                  <div>
+                    <div class="pmc-mode-label">全局</div>
+                    <div class="pmc-mode-desc">全部走代理</div>
+                  </div>
+                </button>
+                <button
+                  class="pmc-mode-btn"
+                  :class="{ 'pmc-mode-active': proxyMode === 'direct' }"
+                  @click="setProxyMode('direct')"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
+                  <div>
+                    <div class="pmc-mode-label">直连</div>
+                    <div class="pmc-mode-desc">不使用代理</div>
+                  </div>
+                </button>
+              </div>
+              <div class="pmc-hint">
+                {{ modeDescriptions[proxyMode] }}
               </div>
             </div>
-            <div class="grid grid-cols-2 gap-4 mt-3 pt-3" :style="{ borderTop: '1px solid var(--border)' }">
-              <div>
-                <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">总上传</div>
-                <div class="text-sm font-bold mono" :style="{ color: 'var(--orange)' }">{{ formatBytes(uploadTotal) }}</div>
-              </div>
-              <div>
-                <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">总下载</div>
-                <div class="text-sm font-bold mono" :style="{ color: 'var(--accent)' }">{{ formatBytes(downloadTotal) }}</div>
-              </div>
-            </div>
-          </EnhancedCard>
+          </div>
         </div>
 
-        <div class="space-y-3">
-          <CurrentProxyCard />
+        <div class="grid-traffic">
+          <TrafficStatsCard />
         </div>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-        <ClashInfoCard />
-        <SystemInfoCard />
-        <IpInfoCard />
+        <div class="grid-bottom">
+          <WebsiteTestCard />
+          <IpInfoCard />
+        </div>
       </div>
     </template>
-  </BasePage>
+  </div>
 </template>
 
 <style scoped>
-.stat-card {
-  border-radius: 12px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  background-color: var(--card-bg);
-  display: flex;
-  gap: 12px;
-  align-items: center;
+.dashboard-page {
+  max-width: 100%;
 }
 
-.stat-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+.dashboard-header {
+  margin-bottom: 20px;
+}
+
+.dashboard-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.grid-top {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.grid-middle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.grid-traffic {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+.grid-bottom {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.proxy-mode-card {
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+  overflow: hidden;
+}
+
+.pmc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pmc-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
+  background-color: rgba(79, 142, 247, 0.12);
 }
 
-.stat-body {
+.pmc-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pmc-body {
+  padding: 12px 16px;
+}
+
+.pmc-modes {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
-.stat-label {
+.pmc-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-align: left;
+  color: var(--text-primary);
+}
+.pmc-mode-btn:hover {
+  border-color: var(--accent);
+}
+.pmc-mode-active {
+  border-color: var(--accent) !important;
+  background-color: rgba(79, 142, 247, 0.08) !important;
+}
+
+.pmc-mode-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pmc-mode-desc {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 1px;
+}
+
+.pmc-hint {
   font-size: 12px;
   color: var(--text-secondary);
-  font-weight: 500;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px dashed var(--border);
 }
 
-.stat-value {
-  font-size: 18px;
-  font-weight: 700;
-  line-height: 1.2;
+@media (max-width: 768px) {
+  .grid-top,
+  .grid-middle,
+  .grid-bottom {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

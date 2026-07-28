@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { Plus, Download, Check, FileJson, RefreshCw, Globe, GitMerge, ScrollText, Trash2, Upload } from "lucide-vue-next";
+import { Plus, Download, Check, FileJson, RefreshCw, Globe, GitMerge, ScrollText, Trash2, Upload, FileUp } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import BasePage from "@/components/BasePage.vue";
@@ -30,6 +30,8 @@ const newProfileName = ref("");
 const newProfileUrl = ref("");
 const newProfileType = ref<"local" | "remote">("local");
 const selectedProfiles = ref<Set<string>>(new Set());
+const isDragOver = ref(false);
+const dropFiles = ref<File[]>([]);
 
 function activateProfile(name: string) {
   profiles.value.forEach((p) => (p.active = p.name === name));
@@ -91,6 +93,54 @@ function addProfile() {
   newProfileUrl.value = "";
 }
 
+function onDragEnter(e: DragEvent) {
+  e.preventDefault();
+  isDragOver.value = true;
+}
+
+function onDragOver(e: DragEvent) {
+  e.preventDefault();
+}
+
+function onDragLeave() {
+  isDragOver.value = false;
+}
+
+function onDrop(e: DragEvent) {
+  e.preventDefault();
+  isDragOver.value = false;
+
+  const files = e.dataTransfer?.files;
+  if (!files || files.length === 0) return;
+
+  const validExts = [".yaml", ".yml", ".json", ".txt"];
+  const dropped = Array.from(files).filter(f =>
+    validExts.some(ext => f.name.endsWith(ext))
+  );
+
+  if (dropped.length === 0) {
+    show("不支持的文件格式，请使用 .yaml/.yml/.json/.txt", "error");
+    return;
+  }
+
+  dropFiles.value = dropped;
+  processDroppedFiles(dropped);
+}
+
+function processDroppedFiles(files: File[]) {
+  for (const file of files) {
+    profiles.value.push({
+      name: file.name,
+      type: "local",
+      active: false,
+      updated: new Date().toLocaleString("zh-CN", { hour12: false }),
+      nodes: 0,
+    });
+  }
+  show(`已导入 ${files.length} 个配置文件`, "success");
+  dropFiles.value = [];
+}
+
 function typeIcon(type: string) {
   switch (type) {
     case "local": return FileJson;
@@ -123,7 +173,14 @@ function typeColor(type: string): string {
 </script>
 
 <template>
-  <BasePage title="配置">
+  <BasePage
+    title="配置"
+    :class="{ 'drop-active': isDragOver }"
+    @dragenter="onDragEnter"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+    @drop="onDrop"
+  >
     <template #actions>
       <div class="flex items-center gap-2">
         <button v-if="selectedProfiles.size > 0" class="btn-ghost text-xs" :style="{ color: 'var(--red)' }" @click="deleteSelected">
@@ -140,6 +197,17 @@ function typeColor(type: string): string {
         </button>
       </div>
     </template>
+
+    <!-- Drop zone overlay -->
+    <Transition name="page">
+      <div v-if="isDragOver" class="drop-overlay">
+        <div class="drop-zone">
+          <FileUp :size="48" style="color: var(--accent)" />
+          <div class="text-lg font-medium mt-4">拖放配置文件到此处</div>
+          <div class="text-sm mt-2" style="color: var(--text-secondary)">支持 .yaml .yml .json .txt 格式</div>
+        </div>
+      </div>
+    </Transition>
 
     <div class="space-y-2 flex-1">
       <div
@@ -265,5 +333,31 @@ function typeColor(type: string): string {
   padding: 1px 6px;
   border-radius: 4px;
   font-weight: 500;
+}
+
+.drop-active {
+  position: relative;
+}
+
+.drop-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: 12px;
+}
+
+.drop-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background-color: rgba(79, 142, 247, 0.05);
 }
 </style>

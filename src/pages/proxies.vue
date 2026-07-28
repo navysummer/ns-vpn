@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { RefreshCw, Check, Zap, Globe, Shield, Route } from "lucide-vue-next";
+import { RefreshCw, Check, Zap, Globe, Shield, Route, Heart, AlertTriangle } from "lucide-vue-next";
 import { delayQuality, formatDelay } from "@/utils/format";
 import BasePage from "@/components/BasePage.vue";
 import ProviderButton from "@/components/ProviderButton.vue";
@@ -21,6 +21,8 @@ interface ProxyGroup {
   type: "Selector" | "URLTest" | "Fallback" | "LoadBalance";
   now: string;
   all: ProxyNode[];
+  lastHealthCheck?: number;
+  healthy?: boolean;
 }
 
 const groups = ref<ProxyGroup[]>([
@@ -67,6 +69,8 @@ const groups = ref<ProxyGroup[]>([
     name: "Auto",
     type: "URLTest",
     now: "HK-01",
+    lastHealthCheck: Date.now() - 30000,
+    healthy: true,
     all: [
       { name: "HK-01", type: "Shadowsocks", delay: 32, now: false },
       { name: "HK-02", type: "Shadowsocks", delay: 0, now: false },
@@ -106,6 +110,10 @@ function testGroupDelay(groupName: string) {
     group.all.forEach((n) => {
       setTimeout(() => { n.delay = Math.floor(Math.random() * 300) + 20; }, Math.random() * 1500);
     });
+    if (group.type === "URLTest") {
+      group.lastHealthCheck = Date.now();
+      group.healthy = true;
+    }
   }
   setTimeout(() => { testingGroup.value = null; }, 2000);
 }
@@ -154,6 +162,18 @@ function refreshProvider(name: string) {
     setTimeout(() => { p.loading = false; }, 1500);
   }
 }
+
+function healthyNodes(group: ProxyGroup): number {
+  return group.all.filter(n => n.delay > 0).length;
+}
+
+function lastCheckAgo(ts?: number): string {
+  if (!ts) return "未测试";
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return `${diff}秒前`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+  return `${Math.floor(diff / 3600)}小时前`;
+}
 </script>
 
 <template>
@@ -192,7 +212,14 @@ function refreshProvider(name: string) {
                 <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ group.all.length }}</span>
               </div>
             </div>
-            <span class="text-xs mono" :style="{ color: 'var(--accent)' }">{{ group.now }}</span>
+            <div class="flex flex-col items-end gap-1">
+              <span class="text-xs mono" :style="{ color: 'var(--accent)' }">{{ group.now }}</span>
+              <div v-if="group.type === 'URLTest'" class="flex items-center gap-1">
+                <span v-if="group.healthy" class="health-dot health-ok"></span>
+                <span v-else class="health-dot health-bad"></span>
+                <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ lastCheckAgo(group.lastHealthCheck) }}</span>
+              </div>
+            </div>
           </button>
         </div>
       </div>
@@ -203,6 +230,9 @@ function refreshProvider(name: string) {
             <span class="text-sm font-medium">{{ selectedGroup }}</span>
             <span class="type-badge" :style="{ backgroundColor: typeBadgeBg(groups.find(g => g.name === selectedGroup)!.type), color: typeBadgeColor(groups.find(g => g.name === selectedGroup)!.type) }">
               {{ groups.find(g => g.name === selectedGroup)!.type }}
+            </span>
+            <span v-if="groups.find(g => g.name === selectedGroup)?.type === 'URLTest'" class="text-xs" :style="{ color: 'var(--text-secondary)' }">
+              {{ healthyNodes(groups.find(g => g.name === selectedGroup)!) }}/{{ groups.find(g => g.name === selectedGroup)!.all.length }} 可用
             </span>
           </div>
           <button class="btn-ghost text-xs" :disabled="testingGroup === selectedGroup" @click="testGroupDelay(selectedGroup)">
@@ -373,6 +403,14 @@ function refreshProvider(name: string) {
 .delay-bad { color: var(--red); }
 .delay-none { color: var(--text-secondary); }
 .delay-active { background-color: rgba(255,255,255,0.15); }
+
+.health-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.health-ok { background-color: var(--green); }
+.health-bad { background-color: var(--red); }
 
 .providers-panel {
   width: 200px;

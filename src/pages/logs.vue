@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from "vue";
-import { Terminal, Download, Pause, Play, ArrowUpDown } from "lucide-vue-next";
+import { Terminal, Download, Pause, Play, ArrowUpDown, ChevronDown, AlertCircle, AlertTriangle, Info } from "lucide-vue-next";
 import BasePage from "@/components/BasePage.vue";
 import EmptyState from "@/components/EmptyState.vue";
 
@@ -16,6 +16,7 @@ const autoScroll = ref(true);
 const paused = ref(false);
 const sortOrder = ref<"asc" | "desc">("asc");
 const searchQuery = ref("");
+const isScrolledUp = ref(false);
 
 const logs = ref<LogEntry[]>(
   Array.from({ length: 200 }, (_, i) => {
@@ -58,6 +59,16 @@ const filteredLogs = computed(() => {
   return result;
 });
 
+const logStats = computed(() => {
+  const all = logs.value;
+  return {
+    total: all.length,
+    info: all.filter(l => l.level === "info").length,
+    warning: all.filter(l => l.level === "warning").length,
+    error: all.filter(l => l.level === "error").length,
+  };
+});
+
 const logContainer = ref<HTMLDivElement | null>(null);
 
 watch(
@@ -72,6 +83,19 @@ watch(
   }
 );
 
+function onScroll() {
+  if (!logContainer.value) return;
+  const { scrollTop, scrollHeight, clientHeight } = logContainer.value;
+  isScrolledUp.value = scrollHeight - scrollTop - clientHeight > 100;
+}
+
+function scrollToBottom() {
+  if (logContainer.value) {
+    logContainer.value.scrollTop = logContainer.value.scrollHeight;
+    isScrolledUp.value = false;
+  }
+}
+
 function clearLogs() { logs.value = []; }
 function togglePause() { paused.value = !paused.value; }
 
@@ -80,6 +104,14 @@ function levelColor(level: string): string {
     case "error": return "var(--red)";
     case "warning": return "var(--orange)";
     default: return "var(--text-secondary)";
+  }
+}
+
+function levelBg(level: string): string {
+  switch (level) {
+    case "error": return "rgba(255,69,58,0.08)";
+    case "warning": return "rgba(255,159,10,0.06)";
+    default: return "transparent";
   }
 }
 
@@ -130,6 +162,25 @@ function exportLogs() {
       </div>
     </template>
 
+    <!-- Log Stats Bar -->
+    <div class="log-stats-bar">
+      <div class="stat-item">
+        <Info :size="12" style="color: var(--text-secondary)" />
+        <span class="stat-count">{{ logStats.info }}</span>
+        <span class="stat-label">信息</span>
+      </div>
+      <div class="stat-item">
+        <AlertTriangle :size="12" style="color: var(--orange)" />
+        <span class="stat-count" style="color: var(--orange)">{{ logStats.warning }}</span>
+        <span class="stat-label">警告</span>
+      </div>
+      <div class="stat-item">
+        <AlertCircle :size="12" style="color: var(--red)" />
+        <span class="stat-count" style="color: var(--red)">{{ logStats.error }}</span>
+        <span class="stat-label">错误</span>
+      </div>
+    </div>
+
     <div class="flex items-center gap-3 mb-3">
       <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
         <button v-for="opt in ([{ label: '全部', value: 'all' }, { label: '信息', value: 'info' }, { label: '警告', value: 'warning' }, { label: '错误', value: 'error' }] as const)" :key="opt.value" class="tab-btn" :class="logLevel === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="logLevel = opt.value">
@@ -149,21 +200,63 @@ function exportLogs() {
       </button>
     </div>
 
-    <div ref="logContainer" class="log-container rounded-xl border overflow-y-auto font-mono text-xs leading-relaxed flex-1" :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }">
-      <div class="p-4 space-y-0.5">
-        <div v-for="(log, i) in filteredLogs" :key="i" class="log-line hover:opacity-80">
-          <span class="log-time">[{{ log.time }}]</span>
-          <span class="log-level" :style="{ color: levelColor(log.level) }">{{ levelBadge(log.level).padEnd(5) }}</span>
-          <span class="log-type" :style="{ color: typeColor(log.type) }">[{{ log.type }}]</span>
-          <span class="log-payload">{{ log.payload }}</span>
+    <div class="log-wrapper">
+      <div ref="logContainer" class="log-container rounded-xl border overflow-y-auto font-mono text-xs leading-relaxed flex-1" :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border)', color: 'var(--text-primary)' }" @scroll="onScroll">
+        <div class="p-4 space-y-0.5">
+          <div v-for="(log, i) in filteredLogs" :key="i" class="log-line" :style="{ backgroundColor: levelBg(log.level) }">
+            <span class="log-time">[{{ log.time }}]</span>
+            <span class="log-level" :style="{ color: levelColor(log.level) }">{{ levelBadge(log.level).padEnd(5) }}</span>
+            <span class="log-type" :style="{ color: typeColor(log.type) }">[{{ log.type }}]</span>
+            <span class="log-payload">{{ log.payload }}</span>
+          </div>
         </div>
+        <EmptyState v-if="filteredLogs.length === 0" :icon="Terminal" title="暂无日志" />
       </div>
-      <EmptyState v-if="filteredLogs.length === 0" :icon="Terminal" title="暂无日志" />
+
+      <!-- Scroll to bottom button -->
+      <Transition name="page">
+        <button v-if="isScrolledUp" class="scroll-bottom-btn" @click="scrollToBottom">
+          <ChevronDown :size="16" />
+        </button>
+      </Transition>
     </div>
   </BasePage>
 </template>
 
 <style scoped>
+.log-stats-bar {
+  display: flex;
+  gap: 16px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stat-count {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "SF Mono", "Fira Code", monospace;
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.log-wrapper {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
 .log-container {
   min-height: 0;
 }
@@ -171,10 +264,35 @@ function exportLogs() {
 .log-line {
   display: flex;
   gap: 8px;
-  padding: 1px 0;
+  padding: 2px 4px;
+  border-radius: 3px;
 }
 .log-time { color: var(--text-secondary); flex-shrink: 0; }
 .log-level { flex-shrink: 0; font-weight: 600; }
 .log-type { flex-shrink: 0; }
 .log-payload { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.scroll-bottom-btn {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--accent);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+  z-index: 10;
+}
+.scroll-bottom-btn:hover {
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
 </style>

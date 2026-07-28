@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { X, Search, ChevronRight, List, LayoutGrid, Activity } from "lucide-vue-next";
+import { X, Search, ChevronRight, List, LayoutGrid, Activity, Settings2, PieChart } from "lucide-vue-next";
 import { formatBytes, formatRelativeTime, formatAlive } from "@/utils/format";
 import BasePage from "@/components/BasePage.vue";
 import EmptyState from "@/components/EmptyState.vue";
@@ -19,6 +19,13 @@ interface Connection {
   alive: number;
   sourceIP: string;
   destinationIP: string;
+}
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  visible: boolean;
+  width: string;
 }
 
 const connections = ref<Connection[]>(
@@ -43,6 +50,21 @@ const searchQuery = ref("");
 const filterNetwork = ref<"all" | "tcp" | "udp">("all");
 const selectedConnection = ref<Connection | null>(null);
 const viewMode = ref<"table" | "list">("table");
+const showColumnManager = ref(false);
+const showProtocolChart = ref(false);
+
+const columns = ref<ColumnDef[]>([
+  { key: "host", label: "主机", visible: true, width: "2fr" },
+  { key: "network", label: "网络", visible: true, width: "1fr" },
+  { key: "type", label: "类型", visible: true, width: "1fr" },
+  { key: "rule", label: "规则", visible: true, width: "1fr" },
+  { key: "alive", label: "存活", visible: true, width: "0.5fr" },
+  { key: "upload", label: "上传", visible: true, width: "0.5fr" },
+  { key: "download", label: "下载", visible: true, width: "0.5fr" },
+]);
+
+const visibleColumns = computed(() => columns.value.filter(c => c.visible));
+const gridTemplate = computed(() => visibleColumns.value.map(c => c.width).join(" "));
 
 const filteredConnections = computed(() => {
   return connections.value.filter((c) => {
@@ -54,6 +76,27 @@ const filteredConnections = computed(() => {
 
 const totalUpload = computed(() => connections.value.reduce((sum, c) => sum + c.upload, 0));
 const totalDownload = computed(() => connections.value.reduce((sum, c) => sum + c.download, 0));
+
+// Protocol breakdown
+const protocolStats = computed(() => {
+  const stats: Record<string, { count: number; upload: number; download: number }> = {};
+  connections.value.forEach(c => {
+    if (!stats[c.type]) stats[c.type] = { count: 0, upload: 0, download: 0 };
+    stats[c.type].count++;
+    stats[c.type].upload += c.upload;
+    stats[c.type].download += c.download;
+  });
+  return Object.entries(stats)
+    .map(([type, data]) => ({ type, ...data }))
+    .sort((a, b) => b.count - a.count);
+});
+
+const protocolColors: Record<string, string> = {
+  HTTP: "#4f8ef7",
+  HTTPS: "#34c759",
+  QUIC: "#bf5af2",
+  WebSocket: "#ff9f0a",
+};
 
 function closeConnection(id: string) {
   connections.value = connections.value.filter((c) => c.id !== id);
@@ -67,6 +110,11 @@ function closeAll() {
 
 function selectConnection(conn: Connection) {
   selectedConnection.value = selectedConnection.value?.id === conn.id ? null : conn;
+}
+
+function toggleColumn(key: string) {
+  const col = columns.value.find(c => c.key === key);
+  if (col) col.visible = !col.visible;
 }
 
 function ruleColor(rule: string): string {
@@ -90,6 +138,14 @@ function ruleColor(rule: string): string {
           <button class="view-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'"><List :size="12" /></button>
           <button class="view-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'"><LayoutGrid :size="12" /></button>
         </div>
+        <button class="btn-ghost text-xs" @click="showProtocolChart = !showProtocolChart">
+          <PieChart :size="12" />
+          协议
+        </button>
+        <button class="btn-ghost text-xs" @click="showColumnManager = !showColumnManager">
+          <Settings2 :size="12" />
+          列管理
+        </button>
         <button class="btn-ghost text-xs" @click="closeAll">关闭全部</button>
       </div>
     </template>
@@ -108,29 +164,87 @@ function ruleColor(rule: string): string {
           </div>
         </div>
 
+        <!-- Protocol Breakdown -->
+        <Transition name="page">
+          <div v-if="showProtocolChart" class="protocol-chart mb-3">
+            <div class="text-xs font-medium mb-2" :style="{ color: 'var(--text-secondary)' }">协议分布</div>
+            <div class="flex gap-3 flex-wrap">
+              <div v-for="stat in protocolStats" :key="stat.type" class="protocol-item">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full" :style="{ backgroundColor: protocolColors[stat.type] || 'var(--text-secondary)' }"></span>
+                  <span class="text-xs font-medium">{{ stat.type }}</span>
+                  <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ stat.count }}</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs mono">
+                  <span :style="{ color: 'var(--orange)' }">↑{{ formatBytes(stat.upload) }}</span>
+                  <span :style="{ color: 'var(--accent)' }">↓{{ formatBytes(stat.download) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Transition>
+
+        <!-- Column Manager -->
+        <Transition name="page">
+          <div v-if="showColumnManager" class="column-manager mb-3">
+            <div class="text-xs font-medium mb-2" :style="{ color: 'var(--text-secondary)' }">显示列</div>
+            <div class="flex flex-wrap gap-2">
+              <label v-for="col in columns" :key="col.key" class="column-toggle">
+                <input
+                  type="checkbox"
+                  :checked="col.visible"
+                  class="column-checkbox"
+                  @change="toggleColumn(col.key)"
+                />
+                <span class="text-xs">{{ col.label }}</span>
+              </label>
+            </div>
+          </div>
+        </Transition>
+
         <div class="rounded-xl border flex-1 overflow-hidden flex flex-col" :style="{ borderColor: 'var(--border)' }">
           <template v-if="viewMode === 'table'">
-            <div class="grid grid-cols-8 gap-2 px-4 py-2.5 text-xs font-medium shrink-0" :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }">
-              <div class="col-span-2">主机</div>
-              <div>网络</div>
-              <div>类型</div>
-              <div>规则</div>
-              <div>存活</div>
-              <div class="text-right">上传</div>
-              <div class="text-right">下载</div>
+            <div
+              class="conn-header"
+              :style="{ gridTemplateColumns: gridTemplate }"
+            >
+              <div v-for="col in visibleColumns" :key="col.key" :class="{ 'text-right': col.key === 'upload' || col.key === 'download' }">
+                {{ col.label }}
+              </div>
             </div>
             <div class="conn-scroll">
-              <div v-for="conn in filteredConnections" :key="conn.id" class="conn-row" :class="{ 'conn-row-active': selectedConnection?.id === conn.id }" @click="selectConnection(conn)">
-                <div class="col-span-2 flex items-center gap-2 min-w-0">
-                  <span class="truncate text-xs font-mono">{{ conn.host }}:{{ conn.port }}</span>
-                  <button class="conn-close opacity-0 group-hover:opacity-100" :style="{ color: 'var(--red)' }" @click.stop="closeConnection(conn.id)"><X :size="10" /></button>
-                </div>
-                <div><span class="tag" :style="{ backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ conn.network.toUpperCase() }}</span></div>
-                <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }}</div>
-                <div><span class="text-xs font-medium" :style="{ color: ruleColor(conn.rule) }">{{ conn.rule }}</span></div>
-                <div class="text-xs mono" :style="{ color: 'var(--text-secondary)' }">{{ formatAlive(conn.alive) }}</div>
-                <div class="text-right font-mono text-xs" :style="{ color: 'var(--orange)' }">{{ formatBytes(conn.upload) }}</div>
-                <div class="text-right font-mono text-xs" :style="{ color: 'var(--accent)' }">{{ formatBytes(conn.download) }}</div>
+              <div
+                v-for="conn in filteredConnections"
+                :key="conn.id"
+                class="conn-row"
+                :class="{ 'conn-row-active': selectedConnection?.id === conn.id }"
+                :style="{ gridTemplateColumns: gridTemplate }"
+                @click="selectConnection(conn)"
+              >
+                <template v-if="visibleColumns.some(c => c.key === 'host')">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="truncate text-xs font-mono">{{ conn.host }}:{{ conn.port }}</span>
+                    <button class="conn-close opacity-0 group-hover:opacity-100" :style="{ color: 'var(--red)' }" @click.stop="closeConnection(conn.id)"><X :size="10" /></button>
+                  </div>
+                </template>
+                <template v-if="visibleColumns.some(c => c.key === 'network')">
+                  <div><span class="tag" :style="{ backgroundColor: conn.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: conn.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ conn.network.toUpperCase() }}</span></div>
+                </template>
+                <template v-if="visibleColumns.some(c => c.key === 'type')">
+                  <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }}</div>
+                </template>
+                <template v-if="visibleColumns.some(c => c.key === 'rule')">
+                  <div><span class="text-xs font-medium" :style="{ color: ruleColor(conn.rule) }">{{ conn.rule }}</span></div>
+                </template>
+                <template v-if="visibleColumns.some(c => c.key === 'alive')">
+                  <div class="text-xs mono" :style="{ color: 'var(--text-secondary)' }">{{ formatAlive(conn.alive) }}</div>
+                </template>
+                <template v-if="visibleColumns.some(c => c.key === 'upload')">
+                  <div class="text-right font-mono text-xs" :style="{ color: 'var(--orange)' }">{{ formatBytes(conn.upload) }}</div>
+                </template>
+                <template v-if="visibleColumns.some(c => c.key === 'download')">
+                  <div class="text-right font-mono text-xs" :style="{ color: 'var(--accent)' }">{{ formatBytes(conn.download) }}</div>
+                </template>
               </div>
             </div>
           </template>
@@ -209,9 +323,21 @@ function ruleColor(rule: string): string {
   max-height: calc(100vh - 280px);
 }
 
+.conn-header {
+  display: grid;
+  gap: 8px;
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .conn-row {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 0.5fr 0.5fr 0.5fr;
   gap: 8px;
   padding: 6px 16px;
   font-size: 13px;
@@ -267,5 +393,48 @@ function ruleColor(rule: string): string {
 .detail-value {
   font-size: 12px;
   color: var(--text-primary);
+}
+
+.column-manager {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+}
+
+.column-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+
+.column-toggle:hover {
+  background-color: var(--bg-hover);
+}
+
+.column-checkbox {
+  width: 12px;
+  height: 12px;
+  accent-color: var(--accent);
+}
+
+.protocol-chart {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+}
+
+.protocol-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background-color: var(--bg-tertiary);
 }
 </style>
