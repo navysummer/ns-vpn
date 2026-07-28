@@ -185,7 +185,7 @@ pub(super) async fn init_verge_config_before_window() -> bool {
 }
 
 pub(super) async fn init_service_manager() {
-    clash_verge_service_ipc::set_config(Some(ServiceManager::config())).await;
+    ns_vpn_service_ipc::set_config(Some(ServiceManager::config())).await;
 
     SERVICE_MANAGER.detect_startup_status().await;
 }

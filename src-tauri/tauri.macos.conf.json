@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "identifier": "com.ns-vpn.app",
+  "identifier": "com.ns-vpn.desktop",
   "productName": "NS VPN",
   "bundle": {
     "targets": ["app", "dmg"],

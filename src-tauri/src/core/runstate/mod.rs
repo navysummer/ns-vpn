@@ -459,7 +459,7 @@ mod tests {
         ServiceVersionReply {
             code: 0,
             message: "ok".to_owned(),
-            protocol: Some(clash_verge_service_ipc::ProtocolInfo::current()),
+            protocol: Some(ns_vpn_service_ipc::ProtocolInfo::current()),
         }
     }
 

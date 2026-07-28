@@ -1,6 +1,6 @@
 use anyhow::{Context as _, Result, bail};
 use ns_vpn_logging::{Type, logging};
-use clash_verge_service_ipc::{RemoteProvider, RuntimeAsset, RuntimeBundle};
+use ns_vpn_service_ipc::{RemoteProvider, RuntimeAsset, RuntimeBundle};
 use serde_yaml_ng::Value;
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};

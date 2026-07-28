@@ -4,7 +4,7 @@ mod state;
 
 use anyhow::Result;
 use arc_swap::{ArcSwap, ArcSwapOption};
-use clash_verge_logger::AsyncLogger;
+use ns_vpn_logger::AsyncLogger;
 use ns_vpn_logging::{Type, logging};
 use once_cell::sync::Lazy;
 use std::{

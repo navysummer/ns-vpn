@@ -7,6 +7,12 @@ members = [
   "crates/tauri-plugin-ns-vpn-sysinfo",
   "crates/ns-vpn-i18n",
   "crates/ns-vpn-limiter",
+  "crates/sysproxy",
+  "crates/ns-vpn-logger",
+  "crates/dark-light",
+  "crates/tauri-plugin-mihomo",
+  "crates/ns-vpn-service-ipc",
+  "crates/kode-bridge",
 ]
 resolver = "2"
 

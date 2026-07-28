@@ -6,7 +6,7 @@ use crate::{
 };
 use anyhow::{Result, bail, ensure};
 use ns_vpn_logging::{Type, logging};
-use clash_verge_service_ipc::{MacosProxyConfig, OwnerSessionProof, ProxyApplyOutcome};
+use ns_vpn_service_ipc::{MacosProxyConfig, OwnerSessionProof, ProxyApplyOutcome};
 use std::{
     future::Future,
     sync::atomic::{AtomicU64, Ordering},
@@ -263,7 +263,7 @@ mod tests {
         service_proxy_config,
     };
     use crate::{config::IVerge, core::manager::RunningMode};
-    use clash_verge_service_ipc::{MacosProxyConfig, OwnerSessionProof, ProxyApplyOutcome};
+    use ns_vpn_service_ipc::{MacosProxyConfig, OwnerSessionProof, ProxyApplyOutcome};
     use parking_lot::Mutex;
     use std::sync::{
         Arc,

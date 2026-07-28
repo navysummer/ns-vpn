@@ -50,7 +50,7 @@ pub struct RealEnv;
 
 impl RunStateEnv for RealEnv {
     async fn probe_service_version(&self) -> Result<ServiceVersionReply> {
-        let response = clash_verge_service_ipc::get_version().await?;
+        let response = ns_vpn_service_ipc::get_version().await?;
         Ok(ServiceVersionReply {
             code: response.code,
             message: response.message,
@@ -105,7 +105,7 @@ pub use fake::FakeEnv;
 #[cfg(test)]
 mod fake {
     use anyhow::{Result, anyhow};
-    use clash_verge_service_ipc::ProtocolInfo;
+    use ns_vpn_service_ipc::ProtocolInfo;
     use parking_lot::Mutex;
 
     use super::{PendingAction, RunState, RunStateEnv, ServiceVersionReply};

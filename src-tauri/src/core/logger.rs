@@ -78,8 +78,8 @@ impl Logger {
             let logger = flexi_logger::Logger::with(log_spec)
                 .log_to_file(FileSpec::default().directory(log_dir).basename(""))
                 .duplicate_to_stdout(log_level.into())
-                .format(clash_verge_logger::console_format)
-                .format_for_files(clash_verge_logger::file_format_with_level)
+                .format(ns_vpn_logger::console_format)
+                .format_for_files(ns_vpn_logger::file_format_with_level)
                 .rotate(
                     Criterion::Size(log_max_size * 1024),
                     flexi_logger::Naming::TimestampsCustomFormat {
@@ -185,7 +185,7 @@ impl Logger {
         // The service writer is auxiliary to the local logger. Synchronize it only
         // for an active service session and do not roll back local settings on failure.
         if should_sync_service_writer(*CoreManager::global().get_running_mode())
-            && let Err(error) = service::update_writer_by_service(&clash_verge_service_ipc::WriterConfig {
+            && let Err(error) = service::update_writer_by_service(&ns_vpn_service_ipc::WriterConfig {
                 directory: String::new(),
                 max_log_size: log_max_size * 1024,
                 max_log_files: log_max_count,
@@ -208,7 +208,7 @@ impl Logger {
                 .basename("sidecar")
                 .suppress_timestamp(),
         )
-        .format(clash_verge_logger::file_format_without_level)
+        .format(ns_vpn_logger::file_format_without_level)
         .rotate(
             Criterion::Size(log_max_size * 1024),
             flexi_logger::Naming::TimestampsCustomFormat {

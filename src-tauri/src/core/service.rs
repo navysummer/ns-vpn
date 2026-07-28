@@ -19,7 +19,7 @@ use crate::{
 };
 use anyhow::{Context as _, Result, bail};
 use ns_vpn_logging::{Type, logging};
-use clash_verge_service_ipc::{
+use ns_vpn_service_ipc::{
     MacosProxyConfig, OwnerSessionProof, ProxyApplyOutcome, RuntimeBundle, ServiceErrorCode, StageRuntimeOutcome,
     StartClashRequest, WriterConfig,
 };
@@ -85,11 +85,11 @@ pub(crate) fn clear_active_service_session() {
 /// A failure here is not a failure to start: it only costs the fast path, so it is reported as
 /// "no" and logged rather than propagated.
 async fn probe_runtime_staging_support() -> bool {
-    match clash_verge_service_ipc::get_version().await {
+    match ns_vpn_service_ipc::get_version().await {
         Ok(response) if response.code == 0 => response
             .data
             .as_ref()
-            .is_some_and(clash_verge_service_ipc::ProtocolInfo::supports_runtime_staging),
+            .is_some_and(ns_vpn_service_ipc::ProtocolInfo::supports_runtime_staging),
         Ok(response) => {
             logging!(
                 warn,
@@ -171,11 +171,11 @@ fn macos_service_install_markers() -> Vec<String> {
     vec![
         format!(
             "/Library/LaunchDaemons/{}.plist",
-            clash_verge_service_ipc::MACOS_SERVICE_ID
+            ns_vpn_service_ipc::MACOS_SERVICE_ID
         ),
         format!(
             "/Library/PrivilegedHelperTools/{}.bundle",
-            clash_verge_service_ipc::MACOS_SERVICE_ID
+            ns_vpn_service_ipc::MACOS_SERVICE_ID
         ),
         #[cfg(not(feature = "verge-dev"))]
         "/Library/LaunchDaemons/io.github.clashverge.helper.plist".to_owned(),
@@ -205,7 +205,7 @@ pub(crate) fn trusted_service_evidence() -> Result<bool> {
     const ERROR_SERVICE_DOES_NOT_EXIST: i32 = 1060;
     let manager = WindowsServiceManager::local_computer(None::<&str>, ServiceManagerAccess::CONNECT)?;
     match manager.open_service(
-        clash_verge_service_ipc::WINDOWS_SERVICE_NAME,
+        ns_vpn_service_ipc::WINDOWS_SERVICE_NAME,
         ServiceAccess::QUERY_STATUS,
     ) {
         Ok(service) => {
@@ -221,7 +221,7 @@ pub(crate) fn trusted_service_evidence() -> Result<bool> {
 
 #[cfg(target_os = "linux")]
 pub(crate) fn trusted_service_evidence() -> Result<bool> {
-    let unit = format!("{}.service", clash_verge_service_ipc::SERVICE_SLUG);
+    let unit = format!("{}.service", ns_vpn_service_ipc::SERVICE_SLUG);
     let output = StdCommand::new("systemctl")
         .args(["show", "--property=LoadState", "--value", &unit])
         .output()
@@ -856,7 +856,7 @@ pub(super) async fn stage_runtime_by_service(config_file: &Path) -> Result<Stage
     let credentials = current_owner_credentials()?;
     let runtime = collect_service_runtime_bundle(config_file).await?;
 
-    let response = clash_verge_service_ipc::stage_runtime(&credentials, &session, &runtime)
+    let response = ns_vpn_service_ipc::stage_runtime(&credentials, &session, &runtime)
         .await
         .context("无法连接到Clash Verge Service")?;
     if response.code > 0 {
@@ -885,7 +885,7 @@ pub(super) async fn start_with_existing_service(config_file: &Path) -> Result<()
         macos_proxy: None,
     };
 
-    let response = match clash_verge_service_ipc::start_clash(&credentials, &request).await {
+    let response = match ns_vpn_service_ipc::start_clash(&credentials, &request).await {
         Ok(response) => response,
         Err(error) => {
             start_owner_monitor();
@@ -945,13 +945,13 @@ pub(super) async fn get_clash_logs_by_service() -> Result<Vec<CompactString>> {
 
     let credentials = current_owner_credentials()?;
     let (generation, response) = capture_generation_before(&OWNER_MONITOR_GENERATION, || {
-        clash_verge_service_ipc::get_clash_logs(&credentials)
+        ns_vpn_service_ipc::get_clash_logs(&credentials)
     })
     .await;
     let response = response.context("无法连接到Clash Verge Service")?;
 
     if response.code > 0 {
-        if response.code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16 {
+        if response.code == ns_vpn_service_ipc::ServiceErrorCode::NotActive as u16 {
             recover_after_owner_loss(generation, OwnerRecoveryReason::Displaced).await;
         }
         let err_msg = response.message;
@@ -966,12 +966,12 @@ pub(super) async fn get_clash_logs_by_service() -> Result<Vec<CompactString>> {
 pub(crate) async fn get_clash_log_snapshot_by_service() -> Result<String> {
     let credentials = current_owner_credentials()?;
     let (generation, response) = capture_generation_before(&OWNER_MONITOR_GENERATION, || {
-        clash_verge_service_ipc::get_clash_log_snapshot(&credentials)
+        ns_vpn_service_ipc::get_clash_log_snapshot(&credentials)
     })
     .await;
     let response = response.context("无法连接到Clash Verge Service")?;
     if response.code > 0 {
-        if response.code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16 {
+        if response.code == ns_vpn_service_ipc::ServiceErrorCode::NotActive as u16 {
             recover_after_owner_loss(generation, OwnerRecoveryReason::Displaced).await;
         }
         bail!(response.message);
@@ -1006,7 +1006,7 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
             return Err(error);
         }
     };
-    let response = match clash_verge_service_ipc::stop_clash(&credentials, &session).await {
+    let response = match ns_vpn_service_ipc::stop_clash(&credentials, &session).await {
         Ok(response) => response,
         Err(error) => {
             start_owner_monitor();
@@ -1017,8 +1017,8 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
     if response.code > 0 {
         if matches!(
             response.code,
-            code if code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16
-                || code == clash_verge_service_ipc::ServiceErrorCode::StaleOwnerSession as u16
+            code if code == ns_vpn_service_ipc::ServiceErrorCode::NotActive as u16
+                || code == ns_vpn_service_ipc::ServiceErrorCode::StaleOwnerSession as u16
         ) {
             recover_after_owner_loss_while_locked(OwnerRecoveryReason::Displaced).await;
         } else {
@@ -1037,7 +1037,7 @@ pub(super) async fn stop_core_by_service() -> Result<()> {
 pub(crate) async fn update_writer_by_service(writer: &WriterConfig) -> Result<()> {
     let credentials = current_owner_credentials()?;
     let session = active_service_session()?;
-    let response = clash_verge_service_ipc::update_writer(&credentials, &session, writer)
+    let response = ns_vpn_service_ipc::update_writer(&credentials, &session, writer)
         .await
         .context("无法连接到Clash Verge Service")?;
     if response.code > 0 {
@@ -1056,7 +1056,7 @@ pub(super) async fn set_system_proxy_by_service_with_session(
     session: &OwnerSessionProof,
 ) -> Result<ProxyApplyOutcome> {
     let credentials = current_owner_credentials()?;
-    let response = clash_verge_service_ipc::set_system_proxy(&credentials, session, proxy)
+    let response = ns_vpn_service_ipc::set_system_proxy(&credentials, session, proxy)
         .await
         .context("无法连接到Clash Verge Service")?;
     if response.code > 0 {
@@ -1131,7 +1131,7 @@ fn start_owner_monitor() {
 /// we did not learn anything. Only the log line distinguishes them.
 async fn read_owner_sample() -> OwnerSample {
     let response = match current_owner_credentials() {
-        Ok(credentials) => clash_verge_service_ipc::get_status(&credentials).await,
+        Ok(credentials) => ns_vpn_service_ipc::get_status(&credentials).await,
         Err(error) => Err(error),
     };
 
@@ -1143,7 +1143,7 @@ async fn read_owner_sample() -> OwnerSample {
         }
     };
 
-    if response.code == clash_verge_service_ipc::ServiceErrorCode::NotActive as u16 {
+    if response.code == ns_vpn_service_ipc::ServiceErrorCode::NotActive as u16 {
         return OwnerSample::NotActive;
     }
     if response.code != 0 {
@@ -1274,8 +1274,8 @@ async fn wait_for_service_ipc() -> Result<()> {
 }
 
 impl ServiceManager {
-    pub const fn config() -> clash_verge_service_ipc::IpcConfig {
-        clash_verge_service_ipc::IpcConfig {
+    pub const fn config() -> ns_vpn_service_ipc::IpcConfig {
+        ns_vpn_service_ipc::IpcConfig {
             default_timeout: Duration::from_millis(150),
             retry_delay: Duration::from_millis(250),
             max_retries: 20,
@@ -1468,7 +1468,7 @@ mod tests {
     #[cfg(unix)]
     use super::{service_core_path_for_with_publisher, service_tool_path_for};
     use crate::core::runstate::{FakeEnv, OwnerRecoveryReason, PendingAction, RunStateStore};
-    use clash_verge_service_ipc::OwnerSessionProof;
+    use ns_vpn_service_ipc::OwnerSessionProof;
     #[cfg(unix)]
     use std::cell::Cell;
     use std::{

@@ -12,7 +12,7 @@ use crate::{
 use anyhow::{Result, anyhow};
 use ns_vpn_draft::DraftTransaction;
 use ns_vpn_logging::{Type, logging};
-use clash_verge_service_ipc::StageRuntimeOutcome;
+use ns_vpn_service_ipc::StageRuntimeOutcome;
 use scopeguard::defer;
 use smartstring::alias::String;
 use std::{collections::HashSet, path::PathBuf, time::Instant};
@@ -333,7 +333,7 @@ impl CoreManager {
 #[cfg(test)]
 mod tests {
     use super::{ConfigApplication, StageAttempt, StageRequest, plan_config_application};
-    use clash_verge_service_ipc::{StageRejection, StageRuntimeOutcome};
+    use ns_vpn_service_ipc::{StageRejection, StageRuntimeOutcome};
 
     #[test]
     fn a_staged_runtime_is_reloaded_from_where_the_service_put_it() {
@@ -400,7 +400,7 @@ mod tests {
 
     #[test]
     fn only_bundle_codes_count_as_a_refusal_of_the_bundle() {
-        use clash_verge_service_ipc::ServiceErrorCode;
+        use ns_vpn_service_ipc::ServiceErrorCode;
 
         assert!(StageRequest::is_about_the_bundle(
             ServiceErrorCode::InvalidRuntimeAsset as u16

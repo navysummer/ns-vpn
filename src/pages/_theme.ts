@@ -1,7 +1,6 @@
 import getSystem from '@/utils/get-system'
 const OS = getSystem()
 
-// default theme setting
 export const defaultTheme = {
   primary_color: '#007AFF',
   secondary_color: '#FC9B76',
@@ -17,7 +16,6 @@ export const defaultTheme = {
   }`,
 }
 
-// dark mode
 export const defaultDarkTheme = {
   ...defaultTheme,
   primary_color: '#0A84FF',

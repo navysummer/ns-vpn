@@ -1,71 +1,90 @@
-import { h, defineComponent } from 'vue'
+import { defineComponent, h, type Component } from 'vue'
+
 import {
   HomeOutline,
   WifiOutline,
   ServerOutline,
   GlobeOutline,
-  GitNetworkOutline,
-  ListOutline,
+  GitBranchOutline,
+  DocumentTextOutline,
   LockOpenOutline,
   SettingsOutline,
 } from '@vicons/ionicons5'
 
-import { navigationItems } from './_navigation-meta'
-import type { Component } from 'vue'
+import ConnectionsSvg from '@/assets/image/itemicon/connections.svg?raw'
+import HomeSvg from '@/assets/image/itemicon/home.svg?raw'
+import LogsSvg from '@/assets/image/itemicon/logs.svg?raw'
+import ProfilesSvg from '@/assets/image/itemicon/profiles.svg?raw'
+import ProxiesSvg from '@/assets/image/itemicon/proxies.svg?raw'
+import RulesSvg from '@/assets/image/itemicon/rules.svg?raw'
+import SettingsSvg from '@/assets/image/itemicon/settings.svg?raw'
+import UnlockSvg from '@/assets/image/itemicon/unlock.svg?raw'
 
-const createIconComponent = (icon: any) =>
-  defineComponent({
-    setup() {
-      return () => h(icon)
+import { navigationItems } from './_navigation-meta'
+import ConnectionsPage from './connections.vue'
+import HomePage from './home.vue'
+import LogsPage from './logs.vue'
+import ProfilePage from './profiles.vue'
+import ProxyPage from './proxies.vue'
+import RulesPage from './rules.vue'
+import SettingPage from './settings.vue'
+import UnlockPage from './unlock.vue'
+
+function rawSvg(svg: string): Component {
+  const html = svg.replace(/<svg[^>]*>/, '').replace(/<\/svg>/, '')
+  return defineComponent({
+    render() {
+      return h('span', { innerHTML: html })
     },
   })
+}
 
-export type NavigationItem = {
+export interface NavItem {
   label: (typeof navigationItems)[keyof typeof navigationItems]['label']
   path: string
   icon: Component[]
-  Component: any
+  component: Component
 }
 
-export const navItems: NavigationItem[] = [
+export const navItems: NavItem[] = [
   {
     ...navigationItems.home,
-    icon: [createIconComponent(HomeOutline), createIconComponent(HomeOutline)],
-    Component: () => import('./home.vue'),
+    icon: [HomeOutline, rawSvg(HomeSvg)],
+    component: HomePage,
   },
   {
     ...navigationItems.proxies,
-    icon: [createIconComponent(WifiOutline), createIconComponent(WifiOutline)],
-    Component: () => import('./proxies.vue'),
+    icon: [WifiOutline, rawSvg(ProxiesSvg)],
+    component: ProxyPage,
   },
   {
     ...navigationItems.profiles,
-    icon: [createIconComponent(ServerOutline), createIconComponent(ServerOutline)],
-    Component: () => import('./profiles.vue'),
+    icon: [ServerOutline, rawSvg(ProfilesSvg)],
+    component: ProfilePage,
   },
   {
     ...navigationItems.connections,
-    icon: [createIconComponent(GlobeOutline), createIconComponent(GlobeOutline)],
-    Component: () => import('./connections.vue'),
+    icon: [GlobeOutline, rawSvg(ConnectionsSvg)],
+    component: ConnectionsPage,
   },
   {
     ...navigationItems.rules,
-    icon: [createIconComponent(GitNetworkOutline), createIconComponent(GitNetworkOutline)],
-    Component: () => import('./rules.vue'),
+    icon: [GitBranchOutline, rawSvg(RulesSvg)],
+    component: RulesPage,
   },
   {
     ...navigationItems.logs,
-    icon: [createIconComponent(ListOutline), createIconComponent(ListOutline)],
-    Component: () => import('./logs.vue'),
+    icon: [DocumentTextOutline, rawSvg(LogsSvg)],
+    component: LogsPage,
   },
   {
     ...navigationItems.unlock,
-    icon: [createIconComponent(LockOpenOutline), createIconComponent(LockOpenOutline)],
-    Component: () => import('./unlock.vue'),
+    icon: [LockOpenOutline, rawSvg(UnlockSvg)],
+    component: UnlockPage,
   },
   {
     ...navigationItems.settings,
-    icon: [createIconComponent(SettingsOutline), createIconComponent(SettingsOutline)],
-    Component: () => import('./settings.vue'),
+    icon: [SettingsOutline, rawSvg(SettingsSvg)],
+    component: SettingPage,
   },
 ]

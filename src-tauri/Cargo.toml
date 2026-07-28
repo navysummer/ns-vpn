@@ -18,8 +18,8 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]
 verge-dev = [
-  "clash_verge_logger/color",
-  "clash_verge_service_ipc/development-channel",
+  "ns_vpn_logger/color",
+  "ns_vpn_service_ipc/development-channel",
 ]
 dev-sidecar = ["verge-dev"]
 tauri-dev = []
@@ -41,7 +41,7 @@ ns-vpn-i18n = { workspace = true }
 ns-vpn-limiter = { workspace = true }
 tauri-plugin-ns-vpn-sysinfo = { workspace = true }
 tauri-plugin-clipboard-manager = { workspace = true }
-tauri = { workspace = true, features = [
+tauri = { version = "2.11.5", features = [
   "protocol-asset",
   "devtools",
   "tray-icon",
@@ -76,9 +76,7 @@ reqwest = { version = "0.13.4", features = [
   "form",
 ] }
 regex = "1.12.4"
-sysproxy = { git = "https://github.com/clash-verge-rev/sysproxy-rs", branch = "main", features = [
-  "guard",
-] }
+sysproxy = { path = "../crates/sysproxy", features = ["guard"] }
 network-interface = { version = "2.0.5", features = ["serde"] }
 tauri-plugin-shell = "2.3.5"
 tauri-plugin-dialog = "2.7.1"
@@ -101,20 +99,18 @@ backon = { version = "1.6.0", features = ["tokio-sleep"] }
 tauri-plugin-http = "2.5.9"
 console-subscriber = { version = "0.5.0", optional = true }
 tauri-plugin-devtools = { version = "2.1.0" }
-tauri-plugin-mihomo = { git = "https://github.com/clash-verge-rev/tauri-plugin-mihomo", branch = "fix/api-robustness" }
-clash_verge_logger = { git = "https://github.com/clash-verge-rev/clash-verge-logger" }
+tauri-plugin-mihomo = { path = "../crates/tauri-plugin-mihomo" }
+ns_vpn_logger = { path = "../crates/ns-vpn-logger" }
 async-trait = "0.1.89"
 # Tracks a branch until the protocol change it carries is tagged; move this to v2.6.0 then.
-clash_verge_service_ipc = { git = "https://github.com/clash-verge-rev/clash-verge-service-ipc.git", branch = "feat/stage-runtime", version = "2.6.0", features = [
-  "client",
-] }
+ns_vpn_service_ipc = { path = "../crates/ns-vpn-service-ipc", features = ["client"] }
 arc-swap = "1.9.2"
 tokio-rustls = "0.26.4"
 rustls = { version = "0.23.41", features = ["ring"] }
 webpki-roots = "1.0.8"
 rust_iso3166 = "0.2.0"
 # Use the git repo until the next release after v2.0.0.
-dark-light = { git = "https://github.com/rust-dark-light/dark-light" }
+dark-light = { path = "../crates/dark-light" }
 windows-sys.workspace = true
 bytes = "1.12.0"
 tokio-util = { version = "0.7.18", features = ["time"] }

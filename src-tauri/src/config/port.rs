@@ -227,7 +227,7 @@ async fn owned_service_core_uses_port(port: u16) -> bool {
             return false;
         }
     };
-    let response = match clash_verge_service_ipc::get_status(&credentials).await {
+    let response = match ns_vpn_service_ipc::get_status(&credentials).await {
         Ok(response) => response,
         Err(error) => {
             logging!(
