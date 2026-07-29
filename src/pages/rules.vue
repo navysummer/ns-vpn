@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { Search, RefreshCw } from "lucide-vue-next";
+import { useAppStore } from "@/stores/app";
 import BasePage from "@/components/BasePage.vue";
-import ProviderButton from "@/components/ProviderButton.vue";
 import EmptyState from "@/components/EmptyState.vue";
+
+const app = useAppStore();
+const { t } = useI18n();
 
 interface RuleEntry {
   type: string;
@@ -12,31 +16,14 @@ interface RuleEntry {
   behavior: string;
 }
 
-const rules = ref<RuleEntry[]>([
-  { type: "DOMAIN-SUFFIX", payload: "google.com", proxy: "Proxy", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "youtube.com", proxy: "Proxy", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "twitter.com", proxy: "Proxy", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "github.com", proxy: "Direct", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "microsoft.com", proxy: "Direct", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "apple.com", proxy: "Direct", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "netflix.com", proxy: "Media", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "spotify.com", proxy: "Media", behavior: "Domain" },
-  { type: "DOMAIN-SUFFIX", payload: "openai.com", proxy: "Ai", behavior: "Domain" },
-  { type: "DOMAIN-KEYWORD", payload: "google", proxy: "Proxy", behavior: "Domain" },
-  { type: "DOMAIN-KEYWORD", payload: "facebook", proxy: "Proxy", behavior: "Domain" },
-  { type: "IP-CIDR", payload: "10.0.0.0/8", proxy: "Direct", behavior: "IPCIDR" },
-  { type: "IP-CIDR", payload: "172.16.0.0/12", proxy: "Direct", behavior: "IPCIDR" },
-  { type: "IP-CIDR", payload: "192.168.0.0/16", proxy: "Direct", behavior: "IPCIDR" },
-  { type: "IP-CIDR", payload: "127.0.0.0/8", proxy: "Direct", behavior: "IPCIDR" },
-  { type: "GEOIP", payload: "CN", proxy: "Direct", behavior: "IPCIDR" },
-  { type: "MATCH", payload: "MATCH", proxy: "Proxy", behavior: "Domain" },
-]);
-
-const ruleProviders = ref([
-  { name: "reject", count: 120, loading: false },
-  { name: "direct", count: 85, loading: false },
-  { name: "proxy", count: 200, loading: false },
-]);
+const rules = computed<RuleEntry[]>(() => {
+  return app.rules.map(r => ({
+    type: r.type,
+    payload: r.payload,
+    proxy: r.proxy,
+    behavior: r.type.startsWith("DOMAIN") ? "Domain" : r.type.startsWith("IP") || r.type === "GEOIP" ? "IPCIDR" : "Other",
+  }));
+});
 
 const searchQuery = ref("");
 const filterType = ref<"all" | "DOMAIN" | "IP-CIDR" | "GEOIP" | "MATCH">("all");
@@ -92,21 +79,13 @@ function typeBg(type: string): string {
   if (type === "MATCH") return "rgba(255,159,10,0.1)";
   return "rgba(152,152,158,0.1)";
 }
-
-function refreshProvider(name: string) {
-  const p = ruleProviders.value.find(x => x.name === name);
-  if (p) {
-    p.loading = true;
-    setTimeout(() => { p.loading = false; }, 1500);
-  }
-}
 </script>
 
 <template>
-  <BasePage title="规则">
+  <BasePage :title="t('rules.title')">
     <template #actions>
       <span class="text-sm" :style="{ color: 'var(--text-secondary)' }">
-        {{ filteredRules.length }} / {{ rules.length }} 条
+        {{ t('rules.countText', { filtered: filteredRules.length, total: rules.length }) }}
       </span>
     </template>
 
@@ -115,10 +94,10 @@ function refreshProvider(name: string) {
         <div class="flex items-center gap-3 mb-3">
           <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
             <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
-            <input v-model="searchQuery" placeholder="搜索规则..." class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
+            <input v-model="searchQuery" :placeholder="t('rules.searchPlaceholder')" class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
           </div>
           <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-            <button v-for="opt in ([{ label: '全部', value: 'all' }, { label: '域名', value: 'DOMAIN' }, { label: 'IP', value: 'IP-CIDR' }, { label: 'GEOIP', value: 'GEOIP' }, { label: 'MATCH', value: 'MATCH' }] as const)" :key="opt.value" class="tab-btn" :class="filterType === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="filterType = opt.value">
+            <button v-for="opt in ([{ label: t('common.all'), value: 'all' }, { label: t('rules.domain'), value: 'DOMAIN' }, { label: 'IP', value: 'IP-CIDR' }, { label: 'GEOIP', value: 'GEOIP' }, { label: 'MATCH', value: 'MATCH' }] as const)" :key="opt.value" class="tab-btn" :class="filterType === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="filterType = opt.value">
               {{ opt.label }}
             </button>
           </div>
@@ -126,10 +105,10 @@ function refreshProvider(name: string) {
 
         <div class="rounded-xl overflow-hidden border flex-1 flex flex-col" :style="{ borderColor: 'var(--border)' }">
           <div class="grid grid-cols-4 gap-2 px-4 py-2.5 text-xs font-medium shrink-0" :style="{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }">
-            <div>类型</div>
-            <div>内容</div>
-            <div>行为</div>
-            <div>代理</div>
+            <div>{{ t('rules.type') }}</div>
+            <div>{{ t('rules.content') }}</div>
+            <div>{{ t('rules.behavior') }}</div>
+            <div>{{ t('rules.proxy') }}</div>
           </div>
           <div class="rules-scroll">
             <div v-for="(rule, i) in filteredRules" :key="i" class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center row-hover" :style="{ borderColor: 'var(--border)' }">
@@ -139,22 +118,7 @@ function refreshProvider(name: string) {
               <div><span class="tag" :style="{ backgroundColor: proxyBg(rule.proxy), color: proxyColor(rule.proxy) }">{{ rule.proxy }}</span></div>
             </div>
           </div>
-          <EmptyState v-if="filteredRules.length === 0" title="暂无匹配规则" />
-        </div>
-      </div>
-
-      <div class="providers-panel">
-        <div class="text-xs font-medium mb-3" :style="{ color: 'var(--text-secondary)' }">规则提供者</div>
-        <div class="space-y-2">
-          <ProviderButton
-            v-for="provider in ruleProviders"
-            :key="provider.name"
-            :name="provider.name"
-            type="rule"
-            :count="provider.count"
-            :loading="provider.loading"
-            @refresh="refreshProvider(provider.name)"
-          />
+          <EmptyState v-if="filteredRules.length === 0" :title="t('rules.noMatchingRules')" />
         </div>
       </div>
     </div>

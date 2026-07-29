@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from "vue";
+import { useI18n } from "vue-i18n";
 import { Terminal, Download, Pause, Play, ArrowUpDown, ChevronDown, AlertCircle, AlertTriangle, Info } from "lucide-vue-next";
+import { useAppStore } from "@/stores/app";
 import BasePage from "@/components/BasePage.vue";
 import EmptyState from "@/components/EmptyState.vue";
 
-interface LogEntry {
-  time: string;
-  type: string;
-  level: string;
-  payload: string;
-}
+const app = useAppStore();
+const { t } = useI18n();
 
 const logLevel = ref<"all" | "info" | "warning" | "error">("all");
 const autoScroll = ref(true);
@@ -17,34 +15,12 @@ const paused = ref(false);
 const sortOrder = ref<"asc" | "desc">("asc");
 const searchQuery = ref("");
 const isScrolledUp = ref(false);
+const clearLocal = ref(false);
 
-const logs = ref<LogEntry[]>(
-  Array.from({ length: 200 }, (_, i) => {
-    const levels = ["info", "warning", "error"] as const;
-    const types = ["INIT", "PROXY", "DNS", "TUN", "HTTP"];
-    const messages = [
-      "Connected to mihomo core v1.18.0",
-      "Loading configuration from /etc/mihomo/config.yaml",
-      "Proxy group Auto: health check passed",
-      "DNS query: example.com -> 1.1.1.1",
-      "New TCP connection: 192.168.1.100:54321 -> 10.0.0.1:443",
-      "TUN device opened: utun4",
-      "Rule match: DOMAIN-SUFFIX,google.com,Proxy",
-      "Memory usage: 45.2MB",
-      "Subscription updated: 45 nodes available",
-      "Proxy HK-01: delay 32ms",
-    ];
-    const time = new Date(Date.now() - (200 - i) * 3000);
-    return {
-      time: time.toLocaleTimeString("zh-CN", { hour12: false }),
-      type: types[Math.floor(Math.random() * types.length)],
-      level: levels[Math.floor(Math.random() * 3)],
-      payload: messages[Math.floor(Math.random() * messages.length)],
-    };
-  })
-);
+const logs = computed(() => app.logs);
 
 const filteredLogs = computed(() => {
+  if (clearLocal.value) return [];
   let result = logs.value;
   if (logLevel.value !== "all") {
     result = result.filter((l) => l.level === logLevel.value);
@@ -96,9 +72,8 @@ function scrollToBottom() {
   }
 }
 
-function clearLogs() { logs.value = []; }
+function clearLogs() { clearLocal.value = true; }
 function togglePause() { paused.value = !paused.value; }
-
 function levelColor(level: string): string {
   switch (level) {
     case "error": return "var(--red)";
@@ -149,54 +124,53 @@ function exportLogs() {
 </script>
 
 <template>
-  <BasePage title="日志">
+  <BasePage :title="t('logs.title')">
     <template #actions>
       <div class="flex items-center gap-2">
-        <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ filteredLogs.length }} 条</span>
+        <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ t('logs.countText', { count: filteredLogs.length }) }}</span>
         <button class="btn-ghost text-xs" @click="togglePause">
           <Pause v-if="!paused" :size="12" /><Play v-else :size="12" />
-          {{ paused ? "继续" : "暂停" }}
+          {{ paused ? t('logs.resume') : t('logs.pause') }}
         </button>
-        <button class="btn-ghost text-xs" @click="exportLogs"><Download :size="12" />导出</button>
-        <button class="btn-ghost text-xs" @click="clearLogs">清空</button>
+        <button class="btn-ghost text-xs" @click="exportLogs"><Download :size="12" />{{ t('logs.export') }}</button>
+        <button class="btn-ghost text-xs" @click="clearLogs">{{ t('logs.clear') }}</button>
       </div>
     </template>
 
-    <!-- Log Stats Bar -->
     <div class="log-stats-bar">
       <div class="stat-item">
         <Info :size="12" style="color: var(--text-secondary)" />
         <span class="stat-count">{{ logStats.info }}</span>
-        <span class="stat-label">信息</span>
+        <span class="stat-label">{{ t('logs.info') }}</span>
       </div>
       <div class="stat-item">
         <AlertTriangle :size="12" style="color: var(--orange)" />
         <span class="stat-count" style="color: var(--orange)">{{ logStats.warning }}</span>
-        <span class="stat-label">警告</span>
+        <span class="stat-label">{{ t('logs.warning') }}</span>
       </div>
       <div class="stat-item">
         <AlertCircle :size="12" style="color: var(--red)" />
         <span class="stat-count" style="color: var(--red)">{{ logStats.error }}</span>
-        <span class="stat-label">错误</span>
+        <span class="stat-label">{{ t('logs.error') }}</span>
       </div>
     </div>
 
     <div class="flex items-center gap-3 mb-3">
       <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-        <button v-for="opt in ([{ label: '全部', value: 'all' }, { label: '信息', value: 'info' }, { label: '警告', value: 'warning' }, { label: '错误', value: 'error' }] as const)" :key="opt.value" class="tab-btn" :class="logLevel === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="logLevel = opt.value">
+        <button v-for="opt in ([{ label: t('common.all'), value: 'all' }, { label: t('logs.info'), value: 'info' }, { label: t('logs.warning'), value: 'warning' }, { label: t('logs.error'), value: 'error' }] as const)" :key="opt.value" class="tab-btn" :class="logLevel === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="logLevel = opt.value">
           {{ opt.label }}
         </button>
       </div>
       <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-        <input v-model="searchQuery" placeholder="搜索日志..." class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
+        <input v-model="searchQuery" :placeholder="t('logs.searchPlaceholder')" class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
       </div>
       <label class="flex items-center gap-2 text-sm cursor-pointer" :style="{ color: 'var(--text-secondary)' }">
         <div class="toggle" :class="{ active: autoScroll }" @click="autoScroll = !autoScroll"><div class="toggle-knob"></div></div>
-        自动滚动
+        {{ t('logs.autoScroll') }}
       </label>
       <button class="btn-ghost text-xs" @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'">
         <ArrowUpDown :size="12" />
-        {{ sortOrder === 'asc' ? '正序' : '倒序' }}
+        {{ sortOrder === 'asc' ? t('logs.asc') : t('logs.desc') }}
       </button>
     </div>
 
@@ -210,10 +184,9 @@ function exportLogs() {
             <span class="log-payload">{{ log.payload }}</span>
           </div>
         </div>
-        <EmptyState v-if="filteredLogs.length === 0" :icon="Terminal" title="暂无日志" />
+        <EmptyState v-if="filteredLogs.length === 0" :icon="Terminal" :title="t('logs.noLogs')" />
       </div>
 
-      <!-- Scroll to bottom button -->
       <Transition name="page">
         <button v-if="isScrolledUp" class="scroll-bottom-btn" @click="scrollToBottom">
           <ChevronDown :size="16" />

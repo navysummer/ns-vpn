@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { RefreshCw, Trash2, Clipboard, ArrowDownToLine, Plus, GripVertical, Settings, FileCode } from "lucide-vue-next";
-import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { RefreshCw, Trash2, Clipboard, Plus, GripVertical, FileCode, Edit, FolderOpen } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
+import { useI18n } from "vue-i18n";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 const { show } = useToast();
+const { t } = useI18n();
 
 interface Subscription {
   name: string;
@@ -17,7 +19,7 @@ const subscriptions = ref<Subscription[]>([
   { name: "awesome-vpn", url: "raw.githubusercontent.com", lastUpdate: "2026-07-27", timeAgo: "1 天前" },
   { name: "cn-news", url: "raw.githubusercontent.com", lastUpdate: "2026-07-27", timeAgo: "1 天前" },
   { name: "daily_free_vpn", url: "sub.466688.xyz", lastUpdate: "2026-06-28", timeAgo: "1 个月前" },
-  { name: "BestClash", url: "cdn.jsdelivr.net", lastUpdate: "2026-07-27", timeAgo: "1 天前" },
+  { name: "BestVPN", url: "cdn.jsdelivr.net", lastUpdate: "2026-07-27", timeAgo: "1 天前" },
   { name: "chromeego-sub", url: "chromeego-sub.netlify.app", lastUpdate: "2026-07-27", timeAgo: "1 天前" },
   { name: "proxypool", url: "raw.githubusercontent.com", lastUpdate: "2026-07-14", timeAgo: "15 天前" },
   { name: "Proxypool2", url: "raw.githubusercontent.com", lastUpdate: "2026-07-29", timeAgo: "5 分钟前" },
@@ -38,10 +40,10 @@ function refreshSubscription(name: string) {
     const sub = subscriptions.value.find(s => s.name === name);
     if (sub) {
       sub.lastUpdate = new Date().toISOString().split("T")[0];
-      sub.timeAgo = "刚刚";
+      sub.timeAgo = t("subscriptions.justNow");
     }
     updating.value = null;
-    show(`已更新订阅: ${name}`, "success");
+    show(`${t('subscriptions.refresh')}: ${name}`, "success");
   }, 1500);
 }
 
@@ -57,7 +59,7 @@ function confirmDelete(name: string) {
 function doDelete() {
   if (deleteTarget.value) {
     subscriptions.value = subscriptions.value.filter(s => s.name !== deleteTarget.value);
-    show(`已删除订阅: ${deleteTarget.value}`, "success");
+    show(`${t('subscriptions.delete')}: ${deleteTarget.value}`, "success");
   }
   showDeleteDialog.value = false;
   deleteTarget.value = null;
@@ -65,39 +67,39 @@ function doDelete() {
 
 function importSub() {
   if (!subUrl.value.trim()) {
-    show("请输入订阅链接", "error");
+    show(t("subscriptions.enterSubUrl"), "error");
     return;
   }
-  show("导入成功", "success");
+  show(t("subscriptions.importSuccess"), "success");
   subUrl.value = "";
 }
 
 function createNew() {
-  show("新建订阅", "info");
+  show(t("subscriptions.createSub"), "info");
 }
 </script>
 
 <template>
   <div class="sub-page">
     <div class="sub-header">
-      <h1 class="sub-title">订阅</h1>
+      <h1 class="sub-title">{{ t('subscriptions.title') }}</h1>
       <div class="sub-header-actions">
-        <button class="header-icon-btn" title="刷新全部" @click="refreshAll">
+        <button class="header-icon-btn" :title="t('common.refresh')" @click="refreshAll">
           <RefreshCw :size="18" />
         </button>
-        <button class="header-icon-btn" title="列表视图">
+        <button class="header-icon-btn" :title="t('subscriptions.gridView')">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/></svg>
         </button>
-        <button class="header-icon-btn" title="剪贴板">
+        <button class="header-icon-btn" :title="t('subscriptions.clipboard')">
           <Clipboard :size="18" />
         </button>
       </div>
     </div>
 
     <div class="sub-input-bar">
-      <input v-model="subUrl" placeholder="订阅文件链接" class="sub-url-input" />
-      <button class="sub-import-btn" @click="importSub">导入</button>
-      <button class="sub-create-btn" @click="createNew">新建</button>
+      <input v-model="subUrl" :placeholder="t('subscriptions.importUrl')" class="sub-url-input" />
+      <button class="sub-import-btn" @click="importSub">{{ t('subscriptions.import') }}</button>
+      <button class="sub-create-btn" @click="createNew">{{ t('subscriptions.create') }}</button>
     </div>
 
     <div class="sub-grid">
@@ -129,11 +131,12 @@ function createNew() {
 
     <div class="sub-footer">
       <div class="sub-footer-card">
-        <span class="footer-label">全局扩展覆写配置</span>
+        <span class="footer-label">{{ t('subscriptions.mergeConfig') }}</span>
         <span class="footer-badge footer-badge-merge">Merge</span>
+        <Edit :size="14" class="footer-icon" />
       </div>
       <div class="sub-footer-card">
-        <span class="footer-label">全局扩展脚本</span>
+        <span class="footer-label">{{ t('subscriptions.scriptConfig') }}</span>
         <span class="footer-badge footer-badge-script">Script</span>
         <FileCode :size="14" class="footer-icon" />
       </div>
@@ -141,9 +144,9 @@ function createNew() {
 
     <ConfirmDialog
       :show="showDeleteDialog"
-      title="删除订阅"
-      :message="`确定要删除订阅「${deleteTarget}」吗？`"
-      confirm-text="删除"
+      :title="t('subscriptions.delete')"
+      :message="t('subscriptions.confirmDeleteMsg', { name: deleteTarget })"
+      :confirm-text="t('common.delete')"
       type="danger"
       @confirm="doDelete"
       @cancel="showDeleteDialog = false"

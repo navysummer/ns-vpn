@@ -1,50 +1,60 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useI18n } from "vue-i18n";
 import { X, Search, ChevronRight, List, LayoutGrid, Activity, Settings2, PieChart } from "lucide-vue-next";
 import { formatBytes, formatRelativeTime, formatAlive } from "@/utils/format";
+import { useAppStore } from "@/stores/app";
 import BasePage from "@/components/BasePage.vue";
 import EmptyState from "@/components/EmptyState.vue";
+
+const app = useAppStore();
+const { t } = useI18n();
 
 interface Connection {
   id: string;
   host: string;
   port: number;
-  network: "tcp" | "udp";
+  network: string;
   type: string;
   rule: string;
   chains: string[];
   upload: number;
   download: number;
-  start: number;
-  alive: number;
+  start: string;
+  startMs: number;
   sourceIP: string;
   destinationIP: string;
+  alive: number;
 }
 
 interface ColumnDef {
   key: string;
-  label: string;
+  labelKey: string;
   visible: boolean;
   width: string;
 }
 
-const connections = ref<Connection[]>(
-  Array.from({ length: 50 }, (_, i) => ({
-    id: `conn-${i}`,
-    host: `192.168.1.${Math.floor(Math.random() * 255)}`,
-    port: Math.floor(Math.random() * 65535) + 1024,
-    network: Math.random() > 0.2 ? "tcp" : "udp",
-    type: ["HTTP", "HTTPS", "QUIC", "WebSocket"][Math.floor(Math.random() * 4)],
-    rule: ["Proxy", "Direct", "Reject", "Media"][Math.floor(Math.random() * 4)],
-    chains: ["Proxy", "Auto"],
-    upload: Math.floor(Math.random() * 10000),
-    download: Math.floor(Math.random() * 1000000),
-    start: Date.now() - Math.floor(Math.random() * 600000),
-    alive: Math.floor(Math.random() * 300),
-    sourceIP: `192.168.1.${Math.floor(Math.random() * 255)}`,
-    destinationIP: `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`,
-  }))
-);
+const connections = computed<Connection[]>(() => {
+  return app.connections.map(c => {
+    const startTime = new Date(c.start).getTime();
+    return {
+      id: c.id,
+      host: c.metadata.host || c.destination,
+      port: 0,
+      network: c.metadata.network || c.network,
+      type: c.metadata.type || c.type,
+      rule: c.rule,
+      chains: c.chains,
+      upload: c.upload,
+      download: c.download,
+      start: c.start,
+      sourceIP: c.source,
+      destinationIP: c.destination,
+      alive: startTime ? Math.floor((Date.now() - startTime) / 1000) : 0,
+      startMs: startTime,
+    };
+  });
+});
 
 const searchQuery = ref("");
 const filterNetwork = ref<"all" | "tcp" | "udp">("all");
@@ -54,13 +64,13 @@ const showColumnManager = ref(false);
 const showProtocolChart = ref(false);
 
 const columns = ref<ColumnDef[]>([
-  { key: "host", label: "主机", visible: true, width: "2fr" },
-  { key: "network", label: "网络", visible: true, width: "1fr" },
-  { key: "type", label: "类型", visible: true, width: "1fr" },
-  { key: "rule", label: "规则", visible: true, width: "1fr" },
-  { key: "alive", label: "存活", visible: true, width: "0.5fr" },
-  { key: "upload", label: "上传", visible: true, width: "0.5fr" },
-  { key: "download", label: "下载", visible: true, width: "0.5fr" },
+  { key: "host", labelKey: "connections.host", visible: true, width: "2fr" },
+  { key: "network", labelKey: "connections.network", visible: true, width: "1fr" },
+  { key: "type", labelKey: "connections.type", visible: true, width: "1fr" },
+  { key: "rule", labelKey: "connections.rule", visible: true, width: "1fr" },
+  { key: "alive", labelKey: "connections.alive", visible: true, width: "0.5fr" },
+  { key: "upload", labelKey: "connections.upload", visible: true, width: "0.5fr" },
+  { key: "download", labelKey: "connections.download", visible: true, width: "0.5fr" },
 ]);
 
 const visibleColumns = computed(() => columns.value.filter(c => c.visible));
@@ -77,7 +87,6 @@ const filteredConnections = computed(() => {
 const totalUpload = computed(() => connections.value.reduce((sum, c) => sum + c.upload, 0));
 const totalDownload = computed(() => connections.value.reduce((sum, c) => sum + c.download, 0));
 
-// Protocol breakdown
 const protocolStats = computed(() => {
   const stats: Record<string, { count: number; upload: number; download: number }> = {};
   connections.value.forEach(c => {
@@ -98,13 +107,13 @@ const protocolColors: Record<string, string> = {
   WebSocket: "#ff9f0a",
 };
 
-function closeConnection(id: string) {
-  connections.value = connections.value.filter((c) => c.id !== id);
+function closeConn(id: string) {
+  app.closeConn(id);
   if (selectedConnection.value?.id === id) selectedConnection.value = null;
 }
 
-function closeAll() {
-  connections.value = [];
+async function closeAllConns() {
+  await app.closeAllConns();
   selectedConnection.value = null;
 }
 
@@ -128,11 +137,11 @@ function ruleColor(rule: string): string {
 </script>
 
 <template>
-  <BasePage title="连接">
+  <BasePage :title="t('connections.title')">
     <template #actions>
       <div class="flex items-center gap-3">
         <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">
-          {{ connections.length }} 连接 · ↓{{ formatBytes(totalDownload) }} ↑{{ formatBytes(totalUpload) }}
+          {{ t('connections.statusText', { count: connections.length, download: formatBytes(totalDownload), upload: formatBytes(totalUpload) }) }}
         </span>
         <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
           <button class="view-btn" :class="{ active: viewMode === 'table' }" @click="viewMode = 'table'"><List :size="12" /></button>
@@ -140,13 +149,13 @@ function ruleColor(rule: string): string {
         </div>
         <button class="btn-ghost text-xs" @click="showProtocolChart = !showProtocolChart">
           <PieChart :size="12" />
-          协议
+          {{ t('connections.protocol') }}
         </button>
         <button class="btn-ghost text-xs" @click="showColumnManager = !showColumnManager">
           <Settings2 :size="12" />
-          列管理
+          {{ t('connections.columnManager') }}
         </button>
-        <button class="btn-ghost text-xs" @click="closeAll">关闭全部</button>
+        <button class="btn-ghost text-xs" @click="closeAllConns">{{ t('connections.closeAll') }}</button>
       </div>
     </template>
 
@@ -155,19 +164,18 @@ function ruleColor(rule: string): string {
         <div class="flex items-center gap-3 mb-3">
           <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm flex-1 max-w-xs" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
             <Search :size="14" :style="{ color: 'var(--text-secondary)' }" />
-            <input v-model="searchQuery" placeholder="搜索主机..." class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
+            <input v-model="searchQuery" :placeholder="t('connections.searchPlaceholder')" class="bg-transparent outline-none flex-1 text-sm" :style="{ color: 'var(--text-primary)' }" />
           </div>
           <div class="flex gap-1 p-0.5 rounded-lg" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
-            <button v-for="opt in ([{ label: '全部', value: 'all' }, { label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp' }] as const)" :key="opt.value" class="tab-btn" :class="filterNetwork === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="filterNetwork = opt.value">
+            <button v-for="opt in ([{ label: t('common.all'), value: 'all' }, { label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp' }] as const)" :key="opt.value" class="tab-btn" :class="filterNetwork === opt.value ? 'tab-btn-active' : 'tab-btn-inactive'" @click="filterNetwork = opt.value">
               {{ opt.label }}
             </button>
           </div>
         </div>
 
-        <!-- Protocol Breakdown -->
         <Transition name="page">
           <div v-if="showProtocolChart" class="protocol-chart mb-3">
-            <div class="text-xs font-medium mb-2" :style="{ color: 'var(--text-secondary)' }">协议分布</div>
+            <div class="text-xs font-medium mb-2" :style="{ color: 'var(--text-secondary)' }">{{ t('connections.protocolDistribution') }}</div>
             <div class="flex gap-3 flex-wrap">
               <div v-for="stat in protocolStats" :key="stat.type" class="protocol-item">
                 <div class="flex items-center gap-2">
@@ -184,10 +192,9 @@ function ruleColor(rule: string): string {
           </div>
         </Transition>
 
-        <!-- Column Manager -->
         <Transition name="page">
           <div v-if="showColumnManager" class="column-manager mb-3">
-            <div class="text-xs font-medium mb-2" :style="{ color: 'var(--text-secondary)' }">显示列</div>
+            <div class="text-xs font-medium mb-2" :style="{ color: 'var(--text-secondary)' }">{{ t('connections.showColumns') }}</div>
             <div class="flex flex-wrap gap-2">
               <label v-for="col in columns" :key="col.key" class="column-toggle">
                 <input
@@ -196,7 +203,7 @@ function ruleColor(rule: string): string {
                   class="column-checkbox"
                   @change="toggleColumn(col.key)"
                 />
-                <span class="text-xs">{{ col.label }}</span>
+                <span class="text-xs">{{ t(col.labelKey) }}</span>
               </label>
             </div>
           </div>
@@ -209,7 +216,7 @@ function ruleColor(rule: string): string {
               :style="{ gridTemplateColumns: gridTemplate }"
             >
               <div v-for="col in visibleColumns" :key="col.key" :class="{ 'text-right': col.key === 'upload' || col.key === 'download' }">
-                {{ col.label }}
+                {{ t(col.labelKey) }}
               </div>
             </div>
             <div class="conn-scroll">
@@ -224,7 +231,7 @@ function ruleColor(rule: string): string {
                 <template v-if="visibleColumns.some(c => c.key === 'host')">
                   <div class="flex items-center gap-2 min-w-0">
                     <span class="truncate text-xs font-mono">{{ conn.host }}:{{ conn.port }}</span>
-                    <button class="conn-close opacity-0 group-hover:opacity-100" :style="{ color: 'var(--red)' }" @click.stop="closeConnection(conn.id)"><X :size="10" /></button>
+                    <button class="conn-close opacity-0 group-hover:opacity-100" :style="{ color: 'var(--red)' }" @click.stop="closeConn(conn.id)"><X :size="10" /></button>
                   </div>
                 </template>
                 <template v-if="visibleColumns.some(c => c.key === 'network')">
@@ -260,7 +267,7 @@ function ruleColor(rule: string): string {
                   </div>
                 </div>
                 <div class="flex items-center justify-between mt-1">
-                  <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }} · {{ formatRelativeTime(conn.start) }}</span>
+                  <span class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ conn.type }} · {{ formatRelativeTime(conn.startMs) }}</span>
                   <div class="flex items-center gap-2 text-xs mono">
                     <span :style="{ color: 'var(--orange)' }">↑{{ formatBytes(conn.upload) }}</span>
                     <span :style="{ color: 'var(--accent)' }">↓{{ formatBytes(conn.download) }}</span>
@@ -270,30 +277,30 @@ function ruleColor(rule: string): string {
             </div>
           </template>
 
-          <EmptyState v-if="filteredConnections.length === 0" :icon="Activity" title="暂无连接" description="当前没有活跃的网络连接" />
+          <EmptyState v-if="filteredConnections.length === 0" :icon="Activity" :title="t('connections.noConnections')" :description="t('connections.noConnectionsDesc')" />
         </div>
       </div>
 
       <Transition name="page">
         <div v-if="selectedConnection" class="detail-panel">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-sm font-medium">连接详情</h3>
+            <h3 class="text-sm font-medium">{{ t('connections.connectionDetail') }}</h3>
             <button class="p-1 rounded hover:opacity-80" :style="{ color: 'var(--text-secondary)' }" @click="selectedConnection = null"><X :size="14" /></button>
           </div>
           <div class="space-y-2">
-            <div class="detail-row"><span class="detail-label">主机</span><span class="detail-value mono">{{ selectedConnection.host }}:{{ selectedConnection.port }}</span></div>
-            <div class="detail-row"><span class="detail-label">网络</span><span class="tag" :style="{ backgroundColor: selectedConnection.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: selectedConnection.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ selectedConnection.network.toUpperCase() }}</span></div>
-            <div class="detail-row"><span class="detail-label">类型</span><span class="detail-value">{{ selectedConnection.type }}</span></div>
-            <div class="detail-row"><span class="detail-label">规则</span><span class="detail-value" :style="{ color: ruleColor(selectedConnection.rule) }">{{ selectedConnection.rule }}</span></div>
-            <div class="detail-row"><span class="detail-label">链路</span><div class="flex items-center gap-1"><span v-for="(chain, i) in selectedConnection.chains" :key="i" class="text-xs"><span :style="{ color: 'var(--accent)' }">{{ chain }}</span><ChevronRight v-if="i < selectedConnection.chains.length - 1" :size="10" class="inline" :style="{ color: 'var(--text-secondary)' }" /></span></div></div>
-            <div class="detail-row"><span class="detail-label">来源</span><span class="detail-value mono text-xs">{{ selectedConnection.sourceIP }}</span></div>
-            <div class="detail-row"><span class="detail-label">目标</span><span class="detail-value mono text-xs">{{ selectedConnection.destinationIP }}</span></div>
-            <div class="detail-row"><span class="detail-label">上传</span><span class="detail-value mono" :style="{ color: 'var(--orange)' }">{{ formatBytes(selectedConnection.upload) }}</span></div>
-            <div class="detail-row"><span class="detail-label">下载</span><span class="detail-value mono" :style="{ color: 'var(--accent)' }">{{ formatBytes(selectedConnection.download) }}</span></div>
-            <div class="detail-row"><span class="detail-label">存活</span><span class="detail-value mono">{{ formatAlive(selectedConnection.alive) }}</span></div>
-            <div class="detail-row"><span class="detail-label">创建时间</span><span class="detail-value text-xs">{{ formatRelativeTime(selectedConnection.start) }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.host') }}</span><span class="detail-value mono">{{ selectedConnection.host }}:{{ selectedConnection.port }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.network') }}</span><span class="tag" :style="{ backgroundColor: selectedConnection.network === 'tcp' ? 'rgba(79,142,247,0.12)' : 'rgba(52,199,89,0.12)', color: selectedConnection.network === 'tcp' ? 'var(--accent)' : 'var(--green)' }">{{ selectedConnection.network.toUpperCase() }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.type') }}</span><span class="detail-value">{{ selectedConnection.type }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.rule') }}</span><span class="detail-value" :style="{ color: ruleColor(selectedConnection.rule) }">{{ selectedConnection.rule }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.chain') }}</span><div class="flex items-center gap-1"><span v-for="(chain, i) in selectedConnection.chains" :key="i" class="text-xs"><span :style="{ color: 'var(--accent)' }">{{ chain }}</span><ChevronRight v-if="i < selectedConnection.chains.length - 1" :size="10" class="inline" :style="{ color: 'var(--text-secondary)' }" /></span></div></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.source') }}</span><span class="detail-value mono text-xs">{{ selectedConnection.sourceIP }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.destination') }}</span><span class="detail-value mono text-xs">{{ selectedConnection.destinationIP }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.upload') }}</span><span class="detail-value mono" :style="{ color: 'var(--orange)' }">{{ formatBytes(selectedConnection.upload) }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.download') }}</span><span class="detail-value mono" :style="{ color: 'var(--accent)' }">{{ formatBytes(selectedConnection.download) }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.alive') }}</span><span class="detail-value mono">{{ formatAlive(selectedConnection.alive) }}</span></div>
+            <div class="detail-row"><span class="detail-label">{{ t('connections.createdAt') }}</span><span class="detail-value text-xs">{{ formatRelativeTime(selectedConnection.startMs) }}</span></div>
           </div>
-          <button class="btn-ghost text-xs w-full mt-4 justify-center" :style="{ color: 'var(--red)' }" @click="closeConnection(selectedConnection.id)"><X :size="12" />关闭此连接</button>
+          <button class="btn-ghost text-xs w-full mt-4 justify-center" :style="{ color: 'var(--red)' }" @click="closeConn(selectedConnection.id)"><X :size="12" />{{ t('connections.closeThis') }}</button>
         </div>
       </Transition>
     </div>

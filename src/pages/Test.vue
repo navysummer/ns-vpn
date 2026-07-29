@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Zap, Check, X, Clock, RefreshCw } from "lucide-vue-next";
 import BasePage from "@/components/BasePage.vue";
 import { useToast } from "@/utils/toast";
 
 const { show } = useToast();
+const { t } = useI18n();
 
 interface TestResult {
   name: string;
@@ -53,7 +55,7 @@ function testAll() {
   setTimeout(() => {
     testingAll.value = false;
     const successCount = testTargets.value.filter(t => t.status === "success").length;
-    show(`测试完成: ${successCount}/${testTargets.value.length} 成功`, "info");
+    show(t("test.testComplete", { success: successCount, total: testTargets.value.length }), "info");
   }, 3000);
 }
 
@@ -66,11 +68,11 @@ function delayColor(delay: number): string {
 </script>
 
 <template>
-  <BasePage title="测试">
+  <BasePage :title="t('test.title')">
     <template #actions>
       <button class="btn-primary text-xs" :disabled="testingAll" @click="testAll">
         <Zap :size="14" :class="{ spin: testingAll }" />
-        {{ testingAll ? "测试中..." : "全面测试" }}
+        {{ testingAll ? t('test.testing') : t('test.fullTest') }}
       </button>
     </template>
 
@@ -91,10 +93,10 @@ function delayColor(delay: number): string {
           </div>
         </div>
         <div class="test-delay">
-          <span v-if="target.status === 'testing'" class="mono" :style="{ color: 'var(--accent)' }">测试中...</span>
-          <span v-else-if="target.status === 'fail'" :style="{ color: 'var(--red)' }">超时</span>
+          <span v-if="target.status === 'testing'" class="mono" :style="{ color: 'var(--accent)' }">{{ t('test.testing') }}</span>
+          <span v-else-if="target.status === 'fail'" :style="{ color: 'var(--red)' }">{{ t('test.timeout') }}</span>
           <span v-else-if="target.delay > 0" class="mono" :style="{ color: delayColor(target.delay) }">{{ target.delay }} ms</span>
-          <span v-else :style="{ color: 'var(--text-secondary)' }">等待测试</span>
+          <span v-else :style="{ color: 'var(--text-secondary)' }">{{ t('test.waiting') }}</span>
         </div>
       </div>
     </div>

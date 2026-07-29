@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from "vue";
+import { watch, onMounted, onUnmounted } from "vue";
 import { useAppStore } from "@/stores/app";
 import Sidebar from "@/components/Sidebar.vue";
 import ToastContainer from "@/components/ToastContainer.vue";
@@ -18,6 +18,15 @@ watch(
   },
   { immediate: true }
 );
+
+onMounted(() => {
+  app.syncFromBackend();
+  app.startPolling();
+});
+
+onUnmounted(() => {
+  app.stopPolling();
+});
 </script>
 
 <template>

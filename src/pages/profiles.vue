@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { useI18n } from "vue-i18n";
 import { Plus, Download, Check, FileJson, RefreshCw, Globe, GitMerge, ScrollText, Trash2, Upload, FileUp } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import BasePage from "@/components/BasePage.vue";
 
 const { show } = useToast();
+const { t } = useI18n();
 
 interface Profile {
   name: string;
@@ -35,15 +37,15 @@ const dropFiles = ref<File[]>([]);
 
 function activateProfile(name: string) {
   profiles.value.forEach((p) => (p.active = p.name === name));
-  show(`已切换到配置: ${name}`, "success");
+  show(t("profiles.switchedTo", { name }), "success");
 }
 
 function updateProfile(name: string) {
-  show(`正在更新配置: ${name}`, "info");
+  show(t("profiles.updating", { name }), "info");
 }
 
 function importProfile() {
-  show("文件选择器将在 Tauri 环境中生效", "info");
+  show(t("profiles.fileSelectorHint"), "info");
 }
 
 function confirmDelete(name: string) {
@@ -54,7 +56,7 @@ function confirmDelete(name: string) {
 function doDelete() {
   if (deleteTarget.value) {
     profiles.value = profiles.value.filter(p => p.name !== deleteTarget.value);
-    show(`已删除配置: ${deleteTarget.value}`, "success");
+    show(t("profiles.deleted", { name: deleteTarget.value }), "success");
   }
   showDeleteDialog.value = false;
   deleteTarget.value = null;
@@ -69,14 +71,15 @@ function toggleSelect(name: string) {
 }
 
 function deleteSelected() {
+  const count = selectedProfiles.value.size;
   profiles.value = profiles.value.filter(p => !selectedProfiles.value.has(p.name));
-  show(`已删除 ${selectedProfiles.value.size} 个配置`, "success");
+  show(t("profiles.deletedCount", { count }), "success");
   selectedProfiles.value.clear();
 }
 
 function addProfile() {
   if (!newProfileName.value.trim()) {
-    show("请输入配置名称", "error");
+    show(t("profiles.enterName"), "error");
     return;
   }
   profiles.value.push({
@@ -87,7 +90,7 @@ function addProfile() {
     updated: new Date().toLocaleString("zh-CN", { hour12: false }),
     nodes: 0,
   });
-  show(`已添加配置: ${newProfileName.value}`, "success");
+  show(t("profiles.added", { name: newProfileName.value }), "success");
   showAddDialog.value = false;
   newProfileName.value = "";
   newProfileUrl.value = "";
@@ -119,7 +122,7 @@ function onDrop(e: DragEvent) {
   );
 
   if (dropped.length === 0) {
-    show("不支持的文件格式，请使用 .yaml/.yml/.json/.txt", "error");
+    show(t("profiles.unsupportedFormat"), "error");
     return;
   }
 
@@ -137,7 +140,7 @@ function processDroppedFiles(files: File[]) {
       nodes: 0,
     });
   }
-  show(`已导入 ${files.length} 个配置文件`, "success");
+  show(t("profiles.importedCount", { count: files.length }), "success");
   dropFiles.value = [];
 }
 
@@ -153,10 +156,10 @@ function typeIcon(type: string) {
 
 function typeLabel(type: string) {
   switch (type) {
-    case "local": return "本地";
-    case "remote": return "远程";
-    case "merge": return "合并";
-    case "script": return "脚本";
+    case "local": return t("profiles.local");
+    case "remote": return t("profiles.remote");
+    case "merge": return t("profiles.merge");
+    case "script": return t("profiles.script");
     default: return type;
   }
 }
@@ -174,7 +177,7 @@ function typeColor(type: string): string {
 
 <template>
   <BasePage
-    title="配置"
+    :title="t('profiles.title')"
     :class="{ 'drop-active': isDragOver }"
     @dragenter="onDragEnter"
     @dragover="onDragOver"
@@ -185,26 +188,25 @@ function typeColor(type: string): string {
       <div class="flex items-center gap-2">
         <button v-if="selectedProfiles.size > 0" class="btn-ghost text-xs" :style="{ color: 'var(--red)' }" @click="deleteSelected">
           <Trash2 :size="12" />
-          删除 ({{ selectedProfiles.size }})
+          {{ t('common.delete') }} ({{ selectedProfiles.size }})
         </button>
         <button class="btn-ghost text-xs" @click="importProfile">
           <Upload :size="14" />
-          导入
+          {{ t('common.import') }}
         </button>
         <button class="btn-primary text-xs" @click="showAddDialog = true">
           <Plus :size="14" />
-          添加
+          {{ t('common.add') }}
         </button>
       </div>
     </template>
 
-    <!-- Drop zone overlay -->
     <Transition name="page">
       <div v-if="isDragOver" class="drop-overlay">
         <div class="drop-zone">
           <FileUp :size="48" style="color: var(--accent)" />
-          <div class="text-lg font-medium mt-4">拖放配置文件到此处</div>
-          <div class="text-sm mt-2" style="color: var(--text-secondary)">支持 .yaml .yml .json .txt 格式</div>
+          <div class="text-lg font-medium mt-4">{{ t('profiles.dragHint') }}</div>
+          <div class="text-sm mt-2" style="color: var(--text-secondary)">{{ t('profiles.dragSubHint') }}</div>
         </div>
       </div>
     </Transition>
@@ -240,7 +242,7 @@ function typeColor(type: string): string {
             <span>·</span>
             <span>{{ profile.updated }}</span>
             <span v-if="profile.nodes > 0">·</span>
-            <span v-if="profile.nodes > 0">{{ profile.nodes }} 节点</span>
+            <span v-if="profile.nodes > 0">{{ profile.nodes }} {{ t('profiles.nodes') }}</span>
           </div>
         </div>
 
@@ -248,7 +250,7 @@ function typeColor(type: string): string {
           <Check v-if="profile.active" :size="16" style="color: var(--green)" />
           <button v-if="profile.type === 'remote'" class="btn-ghost text-xs" @click.stop="updateProfile(profile.name)">
             <RefreshCw :size="12" />
-            更新
+            {{ t('common.update') }}
           </button>
           <button class="btn-ghost p-1" @click.stop="confirmDelete(profile.name)" :style="{ color: 'var(--red)' }">
             <Trash2 :size="14" />
@@ -259,9 +261,9 @@ function typeColor(type: string): string {
 
     <ConfirmDialog
       :show="showDeleteDialog"
-      title="删除配置"
-      :message="`确定要删除配置「${deleteTarget}」吗？此操作不可撤销。`"
-      confirm-text="删除"
+      :title="t('profiles.deleteTitle')"
+      :message="t('profiles.deleteMsg', { name: deleteTarget })"
+      :confirm-text="t('common.delete')"
       type="danger"
       @confirm="doDelete"
       @cancel="showDeleteDialog = false"
@@ -271,33 +273,33 @@ function typeColor(type: string): string {
       <Transition name="page">
         <div v-if="showAddDialog" class="fixed inset-0 flex items-center justify-center bg-black/50 z-50" @click="showAddDialog = false">
           <div class="card w-full max-w-md mx-4 space-y-4" :style="{ backgroundColor: 'var(--bg-secondary)' }" @click.stop>
-            <h3 class="text-base font-medium">添加配置</h3>
+            <h3 class="text-base font-medium">{{ t('profiles.addTitle') }}</h3>
             <div class="space-y-3">
               <div>
-                <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">类型</label>
+                <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">{{ t('profiles.type') }}</label>
                 <div class="flex gap-2">
                   <button class="tab-btn flex-1" :class="newProfileType === 'local' ? 'tab-btn-active' : 'tab-btn-inactive'" @click="newProfileType = 'local'">
                     <FileJson :size="14" />
-                    本地
+                    {{ t('profiles.local') }}
                   </button>
                   <button class="tab-btn flex-1" :class="newProfileType === 'remote' ? 'tab-btn-active' : 'tab-btn-inactive'" @click="newProfileType = 'remote'">
                     <Globe :size="14" />
-                    远程
+                    {{ t('profiles.remote') }}
                   </button>
                 </div>
               </div>
               <div>
-                <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">名称</label>
-                <input v-model="newProfileName" placeholder="配置名称" class="w-full rounded-lg px-3 py-2 text-sm outline-none border" :style="{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }" />
+                <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">{{ t('profiles.name') }}</label>
+                <input v-model="newProfileName" :placeholder="t('profiles.namePlaceholder')" class="w-full rounded-lg px-3 py-2 text-sm outline-none border" :style="{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }" />
               </div>
               <div v-if="newProfileType === 'remote'">
-                <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">订阅 URL</label>
+                <label class="text-xs font-medium mb-1 block" :style="{ color: 'var(--text-secondary)' }">{{ t('profiles.subUrl') }}</label>
                 <input v-model="newProfileUrl" placeholder="https://example.com/sub" class="w-full rounded-lg px-3 py-2 text-sm outline-none border" :style="{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)', borderColor: 'var(--border)' }" />
               </div>
             </div>
             <div class="flex justify-end gap-2">
-              <button class="btn-ghost text-xs" @click="showAddDialog = false">取消</button>
-              <button class="btn-primary text-xs" @click="addProfile">添加</button>
+              <button class="btn-ghost text-xs" @click="showAddDialog = false">{{ t('common.cancel') }}</button>
+              <button class="btn-primary text-xs" @click="addProfile">{{ t('common.add') }}</button>
             </div>
           </div>
         </div>

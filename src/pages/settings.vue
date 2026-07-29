@@ -1,699 +1,674 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { FolderOpen, RotateCw, ExternalLink, Save, Eye, EyeOff, Settings as SettingsIcon, Sliders, Link2, FileCode, Info, Monitor, Server, Globe, Zap, Shield, ChevronDown, ChevronRight } from "lucide-vue-next";
+import { ChevronRight, X, RotateCw, ExternalLink, FolderOpen, Copy, Trash2, Download, Upload } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useToast } from "@/utils/toast";
+import { useI18n } from "vue-i18n";
 
 const app = useAppStore();
 const { show } = useToast();
-
-const activeTab = ref("general");
-
-const tabs = [
-  { key: "general", label: "常规设置", icon: SettingsIcon },
-  { key: "subscription", label: "订阅配置", icon: Link2 },
-  { key: "proxy", label: "代理", icon: Globe },
-  { key: "rules", label: "规则", icon: Sliders },
-  { key: "override", label: "覆写", icon: FileCode },
-  { key: "about", label: "关于", icon: Info },
-];
-
-// General settings
-const language = ref("zh-CN");
-const themeMode = ref(app.theme);
-const windowScale = ref(false);
-const startAtBoot = ref(false);
-const autoUpdate = ref(true);
-const checkUpdateFreq = ref("daily");
-const adminMode = ref(false);
-const disableQuic = ref(false);
-const logFontSize = ref(14);
-
-// Subscription settings
-const subscriptionUrl = ref("https://example.com/sub");
-const autoRefreshSub = ref(true);
-const subRefreshInterval = ref(120);
-
-// Proxy settings
-const mixedPort = ref(7890);
-const apiPort = ref(9090);
-const allowLan = ref(false);
-let bindAddress = ref("*");
-const mode = ref("rule");
-const logLevel = ref("info");
-const ipv6 = ref(false);
-const tcpConcurrent = ref(true);
-let globalClientFingerprint = ref("chrome");
-let findProcess = ref("strict");
-let snifferEnabled = ref(true);
-let snifferOverrideDestination = ref(true);
-let dnsEnhancedMode = ref("fake-ip");
-
-// Core settings
-const corePath = ref("");
-const configPath = ref("");
-const secret = ref("");
-const showSecret = ref(false);
-const serviceMode = ref("service");
-let vergeVersion = ref("2.4.3");
-
-// DNS settings
-const dnsEnable = ref(true);
-const dnsListen = ref("0.0.0.0:1053");
-const fakeIpRange = ref("198.18.0.1/16");
-const nameservers = ref(["223.5.5.5", "119.29.29.29"]);
-const fallbackNameservers = ref(["8.8.8.8", "1.1.1.1"]);
-
-// Clash config editor
-const showClashConfig = ref(false);
-const clashConfigText = ref(`mixed-port: 7890
-allow-lan: false
-bind-address: "*"
-mode: rule
-log-level: info
-external-controller: 127.0.0.1:9090
-ipv6: false
-tcp-concurrent: true
-find-process: strict
-global-client-fingerprint: chrome
-sniffer:
-  enable: true
-  override-destination: true
-
-dns:
-  enable: true
-  listen: 0.0.0.0:1053
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  nameserver:
-    - 223.5.5.5
-    - 119.29.29.29
-  fallback:
-    - 8.8.8.8
-    - 1.1.1.1`);
-
-// Override settings
-const overrideMerge = ref(true);
-const overrideScript = ref(false);
-const overrideMergeContent = ref(`# 全局扩展覆写配置
-# 在此添加需要覆写的配置项`);
-
-const overrideScriptContent = ref(`// 全局扩展脚本
-// 在此添加需要执行的脚本`);
-
-// About
-const lastCheckUpdate = ref(new Date().toLocaleString("zh-CN", { hour12: false }));
+const { t } = useI18n();
 
 const saving = ref(false);
+const lastCheckUpdate = ref(new Date().toLocaleString("zh-CN", { hour12: false }));
+const activePanel = ref<string | null>(null);
 
-function saveConfig() {
-  saving.value = true;
-  app.setTheme(themeMode.value as "dark" | "light" | "auto");
-  setTimeout(() => {
-    saving.value = false;
-    show("设置已保存", "success");
-  }, 400);
+function openPanel(name: string) {
+  activePanel.value = name;
+}
+function closePanel() {
+  activePanel.value = null;
 }
 
-function saveClashConfig() {
-  show("Clash 配置已保存", "success");
-  showClashConfig.value = false;
-}
-
-function saveOverride() {
-  show("覆写配置已保存", "success");
-}
-
-function selectCorePath() {
-  show("文件选择器将在 Tauri 环境中生效", "info");
-}
-
-function selectConfigPath() {
-  show("目录选择器将在 Tauri 环境中生效", "info");
-}
-
-function openClashConfig() {
-  showClashConfig.value = true;
-}
-
-function checkUpdate() {
-  show("正在检查更新...", "info");
-  setTimeout(() => { show("当前已是最新版本", "success"); }, 1500);
-}
-
-function openInTerminal() {
-  show("终端功能将在 Tauri 环境中生效", "info");
-}
-
+// ---- Left column actions ----
 function openExternalController() {
-  show("外部控制功能将在 Tauri 环境中生效", "info");
+  openPanel("externalControl");
+}
+function openWebInterface() {
+  openPanel("webInterface");
+}
+function openCoreInfo() {
+  openPanel("coreInfo");
+}
+function updateGeoData() {
+  show(t("settings.checkingUpdate"), "info");
+  setTimeout(() => show(t("settings.alreadyLatest"), "success"), 2000);
+}
+function openTrafficTunnel() {
+  openPanel("trafficTunnel");
 }
 
-function openSubscriptionConfig() {
-  show("订阅配置将在 Tauri 环境中生效", "info");
+// ---- Right column - Basic ----
+function openStartupScript() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function openThemeSettings() {
+  openPanel("themeSettings");
+}
+function openInterfaceSettings() {
+  openPanel("interfaceSettings");
+}
+function openMiscSettings() {
+  openPanel("miscSettings");
+}
+function openHotkeySettings() {
+  openPanel("hotkeySettings");
 }
 
-function openClashConfigFile() {
-  showClashConfig.value = true;
+// ---- Right column - Advanced ----
+function openBackupSettings() {
+  openPanel("backupSettings");
+}
+function openCurrentConfig() {
+  openPanel("currentConfig");
+}
+function openConfigDir() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function openCoreDir() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function openLogDir() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function checkUpdate() {
+  show(t("settings.checkingUpdate"), "info");
+  setTimeout(() => {
+    lastCheckUpdate.value = new Date().toLocaleString("zh-CN", { hour12: false });
+    show(t("settings.alreadyLatest"), "success");
+  }, 1500);
+}
+function openDevTools() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function openLiteMode() {
+  openPanel("liteMode");
+}
+function exitApp() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function exportDiagnostics() {
+  show(t("settings.fileSelectorHint"), "info");
 }
 
-function startService() {
-  show("服务模式启动中...", "info");
+// ---- Backup actions ----
+function backupConfig() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function restoreConfig() {
+  show(t("settings.fileSelectorHint"), "info");
 }
 
-function restartCore() {
-  show("核心已重启", "success");
+// ---- Current config actions ----
+function openConfigFile() {
+  show(t("settings.fileSelectorHint"), "info");
+}
+function copyConfigPath() {
+  show(t("settings.fileSelectorHint"), "info");
 }
 
-function stopCore() {
-  show("核心已停止", "success");
-}
+const panelTitle = computed(() => {
+  const key = activePanel.value;
+  if (!key) return "";
+  const map: Record<string, string> = {
+    externalControl: "settings.externalControl",
+    webInterface: "settings.webInterface",
+    coreInfo: "settings.nsvpnCore",
+    trafficTunnel: "settings.trafficTunnel",
+    themeSettings: "settings.themeSettings",
+    interfaceSettings: "settings.interfaceSettings",
+    miscSettings: "settings.miscSettings",
+    hotkeySettings: "settings.hotkeySettings",
+    backupSettings: "settings.backupSettings",
+    currentConfig: "settings.currentConfig",
+    liteMode: "settings.liteMode",
+  };
+  return map[key] ?? key;
+});
 </script>
 
 <template>
   <div class="settings-page">
-    <div class="settings-sidebar">
-      <div class="sidebar-title">设置</div>
-      <nav class="sidebar-nav">
-        <button
-          v-for="tab in tabs"
-          :key="tab.key"
-          class="sidebar-item"
-          :class="{ 'sidebar-item-active': activeTab === tab.key }"
-          @click="activeTab = tab.key"
-        >
-          <component :is="tab.icon" :size="16" />
-          <span>{{ tab.label }}</span>
-        </button>
-      </nav>
-    </div>
-
-    <div class="settings-content">
-      <!-- General Settings -->
-      <template v-if="activeTab === 'general'">
-        <div class="settings-section">
-          <h3 class="section-title">外观</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">语言</div>
-              </div>
-              <select v-model="language" class="setting-select">
-                <option value="zh-CN">简体中文</option>
-                <option value="en">English</option>
-              </select>
+    <!-- Left Column -->
+    <div class="settings-left">
+      <!-- System Settings -->
+      <div class="settings-section">
+        <h3 class="section-title">{{ t('settings.systemSettings') }}</h3>
+        <div class="section-body">
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-icon">⚡</span>
+              <span class="setting-label">{{ t('home.networkSettings.tunMode') }}</span>
+              <span class="setting-icon-btn">⚙</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">主题设置</div>
-              </div>
-              <select v-model="themeMode" class="setting-select">
-                <option value="dark">深色</option>
-                <option value="light">浅色</option>
-                <option value="auto">跟随系统</option>
-              </select>
+            <div class="toggle" :class="{ active: app.tunMode }" @click="app.tunMode = !app.tunMode">
+              <div class="toggle-knob"></div>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">窗口放大</div>
-              </div>
-              <div class="toggle" :class="{ active: windowScale }" @click="windowScale = !windowScale">
-                <div class="toggle-knob"></div>
-              </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-icon">⏸</span>
+              <span class="setting-label">{{ t('home.networkSettings.systemProxy') }}</span>
+              <span class="setting-icon-btn">⚙</span>
+            </div>
+            <div class="toggle" :class="{ active: app.systemProxy }" @click="app.systemProxy = !app.systemProxy">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-icon">🚀</span>
+              <span class="setting-label">{{ t('settings.autoStart') }}</span>
+            </div>
+            <div class="toggle" :class="{ active: app.startAtBoot }" @click="app.startAtBoot = !app.startAtBoot">
+              <div class="toggle-knob"></div>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-icon">🔇</span>
+              <span class="setting-label">{{ t('settings.silentStart') }}</span>
+            </div>
+            <div class="toggle" :class="{ active: app.silentStart }" @click="app.silentStart = !app.silentStart">
+              <div class="toggle-knob"></div>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="settings-section">
-          <h3 class="section-title">启动</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">开机自启</div>
-              </div>
-              <div class="toggle" :class="{ active: startAtBoot }" @click="startAtBoot = !startAtBoot">
-                <div class="toggle-knob"></div>
-              </div>
+      <!-- NS-VPN Settings -->
+      <div class="settings-section">
+        <h3 class="section-title">{{ t('settings.nsvpnSettings') }}</h3>
+        <div class="section-body">
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-icon">🌐</span>
+              <span class="setting-label">{{ t('settings.allowLan') }}</span>
+              <span class="setting-icon">👥</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">检查更新</div>
-              </div>
-              <div class="toggle" :class="{ active: autoUpdate }" @click="autoUpdate = !autoUpdate">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">检查更新频率</div>
-              </div>
-              <select v-model="checkUpdateFreq" class="setting-select">
-                <option value="daily">每天</option>
-                <option value="weekly">每周</option>
-                <option value="monthly">每月</option>
-              </select>
+            <div class="toggle" :class="{ active: app.allowLan }" @click="app.allowLan = !app.allowLan">
+              <div class="toggle-knob"></div>
             </div>
           </div>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="section-title">核心</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">外部控制</div>
-                <div class="setting-desc">外部控制地址，可通过 API 控制核心</div>
-              </div>
-              <button class="btn-ghost text-xs" @click="openExternalController">
-                <ExternalLink :size="14" />
-                打开
-              </button>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-icon">🔧</span>
+              <span class="setting-label">{{ t('settings.dnsOverride') }}</span>
+              <span class="setting-icon-btn">⚙</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">Clash 核心路径</div>
-              </div>
-              <button class="btn-ghost text-xs" @click="selectCorePath">
-                <FolderOpen :size="14" />
-                选择文件
-              </button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">服务模式</div>
-                <div class="setting-desc">Tauri 服务模式启动</div>
-              </div>
-              <button class="btn-ghost text-xs" @click="startService">
-                <Zap :size="14" />
-                启动
-              </button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">服务模式启动</div>
-              </div>
-              <div class="toggle active">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">订阅配置</div>
-                <div class="setting-desc">配置文件目录</div>
-              </div>
-              <button class="btn-ghost text-xs" @click="openSubscriptionConfig">
-                <FolderOpen :size="14" />
-                选择文件
-              </button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">Clash 配置</div>
-                <div class="setting-desc">编辑 clash.yaml 配置文件</div>
-              </div>
-              <button class="btn-ghost text-xs" @click="openClashConfigFile">
-                编辑
-              </button>
+            <div class="toggle" :class="{ active: app.dnsEnable }" @click="app.dnsEnable = !app.dnsEnable">
+              <div class="toggle-knob"></div>
             </div>
           </div>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="section-title">其他设置</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">以管理员身份运行</div>
-              </div>
-              <div class="toggle" :class="{ active: adminMode }" @click="adminMode = !adminMode">
-                <div class="toggle-knob"></div>
-              </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.ipv6') }}</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">禁用 QUIC</div>
-              </div>
-              <div class="toggle" :class="{ active: disableQuic }" @click="disableQuic = !disableQuic">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">Log Font Size</div>
-              </div>
-              <input v-model.number="logFontSize" type="number" class="setting-input font-mono" style="width: 80px;" />
+            <div class="toggle" :class="{ active: app.ipv6 }" @click="app.ipv6 = !app.ipv6">
+              <div class="toggle-knob"></div>
             </div>
           </div>
-        </div>
-      </template>
-
-      <!-- Subscription Config -->
-      <template v-if="activeTab === 'subscription'">
-        <div class="settings-section">
-          <h3 class="section-title">订阅配置</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">订阅文件链接</div>
-                <div class="setting-desc">配置文件 URL</div>
-              </div>
-              <div class="flex gap-2">
-                <input v-model="subscriptionUrl" class="setting-input font-mono" style="width: 300px;" placeholder="https://example.com/sub" />
-                <button class="btn-ghost text-xs">导入</button>
-              </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.unifiedDelay') }}</span>
+              <span class="setting-icon-btn">ℹ</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">自动刷新订阅</div>
-              </div>
-              <div class="toggle" :class="{ active: autoRefreshSub }" @click="autoRefreshSub = !autoRefreshSub">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">刷新间隔 (分钟)</div>
-              </div>
-              <input v-model.number="subRefreshInterval" type="number" class="setting-input font-mono" style="width: 100px;" />
+            <div class="toggle" :class="{ active: app.unifiedDelay }" @click="app.unifiedDelay = !app.unifiedDelay">
+              <div class="toggle-knob"></div>
             </div>
           </div>
-        </div>
-      </template>
-
-      <!-- Proxy Settings -->
-      <template v-if="activeTab === 'proxy'">
-        <div class="settings-section">
-          <h3 class="section-title">代理</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">混合端口</div>
-                <div class="setting-desc">HTTP/SOCKS5 混合代理端口</div>
-              </div>
-              <input v-model.number="mixedPort" type="number" class="setting-input font-mono" />
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.logLevel') }}</span>
+              <span class="setting-icon-btn">ℹ</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">允许局域网连接</div>
-              </div>
-              <div class="toggle" :class="{ active: allowLan }" @click="allowLan = !allowLan">
-                <div class="toggle-knob"></div>
-              </div>
+            <select v-model="app.logLevel" class="setting-select">
+              <option value="debug">Debug</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.portSettings') }}</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">绑定地址</div>
-              </div>
-              <input v-model="bindAddress" class="setting-input font-mono" style="width: 120px;" placeholder="*" />
+            <input v-model.number="app.mixedPort" type="number" class="setting-input font-mono" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openExternalController">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.externalControl') }}</span>
+              <span class="setting-icon-btn">⚙</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">运行模式</div>
-              </div>
-              <select v-model="mode" class="setting-select">
-                <option value="rule">规则</option>
-                <option value="global">全局</option>
-                <option value="direct">直连</option>
-              </select>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openWebInterface">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.webInterface') }}</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">日志等级</div>
-              </div>
-              <select v-model="logLevel" class="setting-select">
-                <option value="debug">Debug</option>
-                <option value="info">Info</option>
-                <option value="warning">Warning</option>
-                <option value="error">Error</option>
-              </select>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openCoreInfo">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.nsvpnCore') }}</span>
+              <span class="setting-icon-btn">⚙</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">IPv6</div>
-              </div>
-              <div class="toggle" :class="{ active: ipv6 }" @click="ipv6 = !ipv6">
-                <div class="toggle-knob"></div>
-              </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="updateGeoData">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.updateGeoData') }}</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">TCP 并发</div>
-                <div class="setting-desc">同时建立多个 TCP 连接</div>
-              </div>
-              <div class="toggle" :class="{ active: tcpConcurrent }" @click="tcpConcurrent = !tcpConcurrent">
-                <div class="toggle-knob"></div>
-              </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openTrafficTunnel">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.trafficTunnel') }}</span>
             </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">嗅探</div>
-                <div class="setting-desc">从流量中提取域名和协议</div>
-              </div>
-              <div class="toggle" :class="{ active: snifferEnabled }" @click="snifferEnabled = !snifferEnabled">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">嗅探覆盖目标地址</div>
-              </div>
-              <div class="toggle" :class="{ active: snifferOverrideDestination }" @click="snifferOverrideDestination = !snifferOverrideDestination">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">客户端指纹</div>
-              </div>
-              <select v-model="globalClientFingerprint" class="setting-select">
-                <option value="chrome">Chrome</option>
-                <option value="firefox">Firefox</option>
-                <option value="safari">Safari</option>
-                <option value="edge">Edge</option>
-                <option value="ios">iOS</option>
-                <option value="android">Android</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">进程匹配模式</div>
-              </div>
-              <select v-model="findProcess" class="setting-select">
-                <option value="strict">Strict</option>
-                <option value="moderate">Moderate</option>
-                <option value="off">Off</option>
-              </select>
-            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
           </div>
         </div>
-
-        <div class="settings-section">
-          <h3 class="section-title">DNS</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">启用 DNS</div>
-              </div>
-              <div class="toggle" :class="{ active: dnsEnable }" @click="dnsEnable = !dnsEnable">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">DNS 增强模式</div>
-              </div>
-              <select v-model="dnsEnhancedMode" class="setting-select">
-                <option value="fake-ip">fake-ip</option>
-                <option value="redir-host">redir-host</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">DNS 监听地址</div>
-              </div>
-              <input v-model="dnsListen" class="setting-input font-mono" placeholder="0.0.0.0:1053" />
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">fake-ip-range</div>
-              </div>
-              <input v-model="fakeIpRange" class="setting-input font-mono" placeholder="198.18.0.1/16" />
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">Nameservers</div>
-              </div>
-              <textarea v-model="nameservers" class="setting-textarea font-mono" rows="3" placeholder="223.5.5.5&#10;119.29.29.29"></textarea>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">Fallback Nameservers</div>
-              </div>
-              <textarea v-model="fallbackNameservers" class="setting-textarea font-mono" rows="3" placeholder="8.8.8.8&#10;1.1.1.1"></textarea>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- Rules Settings -->
-      <template v-if="activeTab === 'rules'">
-        <div class="settings-section">
-          <h3 class="section-title">规则</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">规则模式</div>
-                <div class="setting-desc">规则匹配模式</div>
-              </div>
-              <select class="setting-select">
-                <option value="domain">域名匹配</option>
-                <option value="ip">IP 匹配</option>
-                <option value="all">全部匹配</option>
-              </select>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">GeoIP 数据库</div>
-              </div>
-              <button class="btn-ghost text-xs">
-                <FolderOpen :size="14" />
-                选择文件
-              </button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">GeoSite 数据库</div>
-              </div>
-              <button class="btn-ghost text-xs">
-                <FolderOpen :size="14" />
-                选择文件
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- Override Settings -->
-      <template v-if="activeTab === 'override'">
-        <div class="settings-section">
-          <h3 class="section-title">全局扩展覆写配置</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">启用覆写</div>
-              </div>
-              <div class="toggle" :class="{ active: overrideMerge }" @click="overrideMerge = !overrideMerge">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div v-if="overrideMerge" class="setting-row" style="flex-direction: column; align-items: stretch;">
-              <textarea v-model="overrideMergeContent" class="setting-textarea font-mono" rows="12" placeholder="# 在此添加覆写配置"></textarea>
-            </div>
-          </div>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="section-title">全局扩展脚本</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">启用脚本</div>
-              </div>
-              <div class="toggle" :class="{ active: overrideScript }" @click="overrideScript = !overrideScript">
-                <div class="toggle-knob"></div>
-              </div>
-            </div>
-            <div v-if="overrideScript" class="setting-row" style="flex-direction: column; align-items: stretch;">
-              <textarea v-model="overrideScriptContent" class="setting-textarea font-mono" rows="12" placeholder="// 在此添加脚本"></textarea>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- About -->
-      <template v-if="activeTab === 'about'">
-        <div class="settings-section">
-          <h3 class="section-title">关于</h3>
-          <div class="section-body">
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">应用名称</div>
-              </div>
-              <span class="setting-value">NS VPN</span>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">版本</div>
-              </div>
-              <span class="setting-value mono">v{{ vergeVersion }}</span>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">操作系统信息</div>
-              </div>
-              <span class="setting-value">macOS arm64</span>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">最后检查更新</div>
-              </div>
-              <span class="setting-value text-xs">{{ lastCheckUpdate }}</span>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">检查更新</div>
-              </div>
-              <button class="btn-ghost text-xs" @click="checkUpdate">
-                <RotateCw :size="14" />
-                检查更新
-              </button>
-            </div>
-            <div class="setting-row">
-              <div class="setting-left">
-                <div class="setting-label">GitHub</div>
-              </div>
-              <a href="https://github.com" target="_blank" class="btn-ghost text-xs">
-                <ExternalLink :size="14" />
-                打开
-              </a>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <!-- Bottom save bar -->
-      <div class="settings-save-bar">
-        <button class="save-btn" :disabled="saving" @click="saveConfig">
-          <RotateCw v-if="saving" :size="14" class="spin" />
-          <RotateCw v-else :size="14" />
-          {{ saving ? "保存中..." : "保存设置" }}
-        </button>
       </div>
     </div>
 
-    <!-- Clash Config Modal -->
-    <Teleport to="body">
-      <Transition name="page">
-        <div v-if="showClashConfig" class="fixed inset-0 flex items-center justify-center bg-black/50 z-50" @click="showClashConfig = false">
-          <div class="clash-editor-modal" @click.stop>
-            <div class="clash-editor-header">
-              <span class="text-sm font-medium">Clash 配置编辑器</span>
-              <div class="flex items-center gap-2">
-                <button class="btn-ghost text-xs" @click="showClashConfig = false">取消</button>
-                <button class="btn-primary text-xs" @click="saveClashConfig">
-                  <Save :size="12" />
-                  保存
-                </button>
-              </div>
+    <!-- Right Column -->
+    <div class="settings-right">
+      <!-- NS-VPN Basic Settings -->
+      <div class="settings-section">
+        <h3 class="section-title">{{ t('settings.nsvpnBasic') }}</h3>
+        <div class="section-body">
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.language') }}</span>
             </div>
-            <textarea
-              v-model="clashConfigText"
-              class="clash-editor-textarea"
-              spellcheck="false"
-            ></textarea>
+            <select v-model="app.language" class="setting-select">
+              <option value="zh-CN">{{ t('settings.simplifiedChinese') }}</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.themeMode') }}</span>
+            </div>
+            <div class="theme-btns">
+              <button class="theme-btn" :class="{ active: app.theme === 'light' }" @click="app.theme = 'light'">{{ t('settings.light') }}</button>
+              <button class="theme-btn" :class="{ active: app.theme === 'dark' }" @click="app.theme = 'dark'">{{ t('settings.dark') }}</button>
+              <button class="theme-btn" :class="{ active: app.theme === 'auto' }" @click="app.theme = 'auto'">{{ t('settings.auto') }}</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.trayClick') }}</span>
+            </div>
+            <select v-model="app.trayClickAction" class="setting-select">
+              <option value="show">{{ t('settings.showMainWindow') }}</option>
+              <option value="toggle">{{ t('settings.toggleWindow') }}</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.copyEnvType') }}</span>
+              <span class="setting-icon">📋</span>
+            </div>
+            <select v-model="app.copyEnvType" class="setting-select">
+              <option value="bash">Bash</option>
+              <option value="powershell">PowerShell</option>
+              <option value="cmd">CMD</option>
+            </select>
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.startupPage') }}</span>
+            </div>
+            <select v-model="app.startupPage" class="setting-select">
+              <option value="dashboard">{{ t('nav.home') }}</option>
+              <option value="proxies">{{ t('nav.proxies') }}</option>
+              <option value="settings">{{ t('nav.settings') }}</option>
+            </select>
+          </div>
+          <div class="setting-row setting-row-link" @click="openStartupScript">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.startupScript') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openThemeSettings">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.themeSettings') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openInterfaceSettings">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.interfaceSettings') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openMiscSettings">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.miscSettings') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openHotkeySettings">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.hotkeySettings') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
           </div>
         </div>
-      </Transition>
+      </div>
+
+      <!-- NS-VPN Advanced Settings -->
+      <div class="settings-section">
+        <h3 class="section-title">{{ t('settings.nsvpnAdvanced') }}</h3>
+        <div class="section-body">
+          <div class="setting-row setting-row-link" @click="openBackupSettings">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.backupSettings') }}</span>
+              <span class="setting-icon-btn">ℹ</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openCurrentConfig">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.currentConfig') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openConfigDir">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.configDir') }}</span>
+              <span class="setting-icon-btn">ℹ</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openCoreDir">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.coreDir') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openLogDir">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.logDir') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="checkUpdate">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.checkUpdate') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openDevTools">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.devTools') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openLiteMode">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.liteMode') }}</span>
+              <span class="setting-icon-btn">ℹ</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="exitApp">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.exit') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="exportDiagnostics">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.exportDiagnostics') }}</span>
+              <span class="setting-icon">📋</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.nsvpnVersion') }}</span>
+              <span class="setting-icon">📋</span>
+            </div>
+            <span class="setting-value mono">v2.4.3</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Panel -->
+    <Teleport to="body">
+      <div v-if="activePanel" class="modal-overlay" @click.self="closePanel">
+        <div class="modal-panel">
+          <div class="modal-header">
+            <h3 class="modal-title">{{ t(panelTitle) }}</h3>
+            <button class="modal-close" @click="closePanel">
+              <X :size="18" />
+            </button>
+          </div>
+          <div class="modal-body">
+            <!-- External Control -->
+            <template v-if="activePanel === 'externalControl'">
+              <div class="modal-desc">{{ t('settings.externalControlDesc') }}</div>
+              <div class="modal-field">
+                <label class="modal-label">API URL</label>
+                <div class="modal-row">
+                  <input class="modal-input" value="http://127.0.0.1:9090" readonly />
+                  <button class="modal-btn-icon" @click="show(t('common.success'), 'success')"><Copy :size="14" /></button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Web Interface -->
+            <template v-if="activePanel === 'webInterface'">
+              <div class="modal-desc">{{ t('settings.webInterfaceDesc') }}</div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.webInterface') }}</label>
+                <div class="modal-row">
+                  <input class="modal-input" value="http://127.0.0.1:9090/ui" readonly />
+                  <button class="modal-btn-icon" @click="show(t('common.success'), 'success')"><Copy :size="14" /></button>
+                  <button class="modal-btn-icon" @click="show(t('settings.fileSelectorHint'), 'info')"><ExternalLink :size="14" /></button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Core Info -->
+            <template v-if="activePanel === 'coreInfo'">
+              <div class="modal-field">
+                <label class="modal-label">{{ t('home.coreInfo.coreVersion') }}</label>
+                <div class="modal-row">
+                  <input class="modal-input" value="v1.18.0" readonly />
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.corePath') }}</label>
+                <div class="modal-row">
+                  <input class="modal-input" value="/usr/local/bin/ns-vpn-core" readonly />
+                  <button class="modal-btn-icon" @click="show(t('settings.fileSelectorHint'), 'info')"><FolderOpen :size="14" /></button>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('home.coreInfo.uptime') }}</label>
+                <span class="modal-text">12h 34m</span>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('home.coreInfo.rulesCount') }}</label>
+                <span class="modal-text">3,284</span>
+              </div>
+            </template>
+
+            <!-- Traffic Tunnel -->
+            <template v-if="activePanel === 'trafficTunnel'">
+              <div class="modal-desc">{{ t('settings.trafficTunnelDesc') }}</div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.trafficTunnel') }}</label>
+                <select class="modal-select">
+                  <option value="system">{{ t('settings.systemProxy') }}</option>
+                  <option value="tun">{{ t('home.networkSettings.tunMode') }}</option>
+                </select>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.allowLan') }}</label>
+                <div class="toggle" :class="{ active: app.allowLan }" @click="app.allowLan = !app.allowLan">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Theme Settings -->
+            <template v-if="activePanel === 'themeSettings'">
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.themeMode') }}</label>
+                <div class="theme-btns modal-btns">
+                  <button class="theme-btn" :class="{ active: app.theme === 'light' }" @click="app.theme = 'light'">{{ t('settings.light') }}</button>
+                  <button class="theme-btn" :class="{ active: app.theme === 'dark' }" @click="app.theme = 'dark'">{{ t('settings.dark') }}</button>
+                  <button class="theme-btn" :class="{ active: app.theme === 'auto' }" @click="app.theme = 'auto'">{{ t('settings.auto') }}</button>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.accentColor') }}</label>
+                <div class="color-grid">
+                  <button class="color-swatch active" style="background:#6366f1"></button>
+                  <button class="color-swatch" style="background:#8b5cf6"></button>
+                  <button class="color-swatch" style="background:#ec4899"></button>
+                  <button class="color-swatch" style="background:#f43f5e"></button>
+                  <button class="color-swatch" style="background:#f97316"></button>
+                  <button class="color-swatch" style="background:#22c55e"></button>
+                  <button class="color-swatch" style="background:#06b6d4"></button>
+                  <button class="color-swatch" style="background:#3b82f6"></button>
+                </div>
+              </div>
+            </template>
+
+            <!-- Interface Settings -->
+            <template v-if="activePanel === 'interfaceSettings'">
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.windowScale') }}</label>
+                <div class="toggle" :class="{ active: app.windowScale }" @click="app.windowScale = !app.windowScale">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.logFontSize') }}</label>
+                <div class="modal-row">
+                  <input v-model.number="app.logFontSize" type="range" min="10" max="24" class="modal-range" />
+                  <span class="modal-text">{{ app.logFontSize }}px</span>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.sidebarCompact') }}</label>
+                <div class="toggle" :class="{ active: app.sidebarCollapsed }" @click="app.sidebarCollapsed = !app.sidebarCollapsed">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Misc Settings -->
+            <template v-if="activePanel === 'miscSettings'">
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.adminMode') }}</label>
+                <div class="toggle" :class="{ active: app.adminMode }" @click="app.adminMode = !app.adminMode">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.disableQuic') }}</label>
+                <div class="toggle" :class="{ active: app.disableQuic }" @click="app.disableQuic = !app.disableQuic">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.autoUpdate') }}</label>
+                <div class="toggle" :class="{ active: app.autoUpdate }" @click="app.autoUpdate = !app.autoUpdate">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.checkUpdateFreq') }}</label>
+                <select v-model="app.checkUpdateFreq" class="modal-select">
+                  <option value="daily">{{ t('settings.freqDaily') }}</option>
+                  <option value="weekly">{{ t('settings.freqWeekly') }}</option>
+                  <option value="monthly">{{ t('settings.freqMonthly') }}</option>
+                  <option value="never">{{ t('settings.freqNever') }}</option>
+                </select>
+              </div>
+            </template>
+
+            <!-- Hotkey Settings -->
+            <template v-if="activePanel === 'hotkeySettings'">
+              <div class="modal-desc">{{ t('settings.hotkeyDesc') }}</div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.hotkeyShowHide') }}</label>
+                <input class="modal-input" value="Ctrl+Shift+Space" readonly />
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.hotkeyQuickSwitch') }}</label>
+                <input class="modal-input" value="Ctrl+Shift+Q" readonly />
+              </div>
+            </template>
+
+            <!-- Backup Settings -->
+            <template v-if="activePanel === 'backupSettings'">
+              <div class="modal-desc">{{ t('settings.backupDesc') }}</div>
+              <div class="modal-actions">
+                <button class="modal-btn primary" @click="backupConfig">
+                  <Download :size="14" />
+                  {{ t('settings.exportConfig') }}
+                </button>
+                <button class="modal-btn" @click="restoreConfig">
+                  <Upload :size="14" />
+                  {{ t('settings.importConfig') }}
+                </button>
+              </div>
+              <div class="modal-field" style="margin-top:16px">
+                <label class="modal-label">{{ t('settings.autoBackup') }}</label>
+                <div class="toggle active">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Current Config -->
+            <template v-if="activePanel === 'currentConfig'">
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.configName') }}</label>
+                <span class="modal-text">default.yaml</span>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.configSize') }}</label>
+                <span class="modal-text">12.4 KB</span>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.configModified') }}</label>
+                <span class="modal-text">2026-07-28 10:30</span>
+              </div>
+              <div class="modal-actions">
+                <button class="modal-btn primary" @click="openConfigFile">
+                  <FolderOpen :size="14" />
+                  {{ t('settings.openConfigFile') }}
+                </button>
+                <button class="modal-btn" @click="copyConfigPath">
+                  <Copy :size="14" />
+                  {{ t('settings.copyConfigPath') }}
+                </button>
+              </div>
+            </template>
+
+            <!-- Lite Mode -->
+            <template v-if="activePanel === 'liteMode'">
+              <div class="modal-desc">{{ t('settings.liteModeDesc') }}</div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.liteMode') }}</label>
+                <div class="toggle" :class="{ active: app.liteMode }" @click="app.liteMode = !app.liteMode">
+                  <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </div>
     </Teleport>
   </div>
 </template>
@@ -706,58 +681,15 @@ function stopCore() {
   min-height: calc(100vh - 120px);
 }
 
-.settings-sidebar {
-  width: 180px;
-  min-width: 180px;
-  background-color: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 12px;
-  height: fit-content;
-  position: sticky;
-  top: 20px;
-}
-
-.sidebar-title {
-  font-size: 16px;
-  font-weight: 700;
-  padding: 8px 12px 16px;
-}
-
-.sidebar-nav {
+.settings-left {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 16px;
 }
 
-.sidebar-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: all 150ms ease;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  text-align: left;
-  width: 100%;
-}
-.sidebar-item:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
-}
-.sidebar-item-active {
-  background-color: var(--accent);
-  color: #fff !important;
-}
-
-.settings-content {
+.settings-right {
   flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -788,15 +720,37 @@ function stopCore() {
   justify-content: space-between;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
+  min-height: 44px;
 }
 .setting-row:last-child {
   border-bottom: none;
 }
 
+.setting-row-link {
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.setting-row-link:hover {
+  background-color: var(--bg-hover);
+  margin: 0 -16px;
+  padding: 10px 16px;
+}
+
 .setting-left {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.setting-icon {
+  font-size: 14px;
+}
+
+.setting-icon-btn {
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: help;
 }
 
 .setting-label {
@@ -814,6 +768,16 @@ function stopCore() {
   color: var(--text-secondary);
 }
 
+.setting-link {
+  font-size: 13px;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.setting-arrow {
+  color: var(--text-secondary);
+}
+
 .setting-select {
   border-radius: 8px;
   padding: 6px 12px;
@@ -823,6 +787,7 @@ function stopCore() {
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
   cursor: pointer;
+  min-width: 120px;
 }
 
 .setting-input {
@@ -837,87 +802,222 @@ function stopCore() {
   color: var(--text-primary);
 }
 
-.setting-textarea {
-  width: 100%;
+.theme-btns {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
   border-radius: 8px;
-  padding: 10px 12px;
+  background-color: var(--bg-tertiary);
+}
+
+.theme-btn {
+  padding: 5px 12px;
+  border-radius: 6px;
   font-size: 12px;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: all 150ms ease;
+  background: transparent;
+  color: var(--text-secondary);
+}
+.theme-btn:hover {
+  color: var(--text-primary);
+}
+.theme-btn.active {
+  background-color: var(--accent);
+  color: #fff;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-panel {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  width: 440px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-close:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.modal-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
   line-height: 1.5;
-  resize: vertical;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.modal-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.modal-text {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.modal-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-input {
+  flex: 1;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
   outline: none;
   border: 1px solid var(--border);
   background-color: var(--bg-tertiary);
   color: var(--text-primary);
 }
 
-.settings-save-bar {
-  display: flex;
-  justify-content: flex-end;
-  padding: 12px 0;
-  margin-top: auto;
+.modal-select {
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+  border: 1px solid var(--border);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
-.save-btn {
+.modal-range {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.modal-btn-icon {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
+  justify-content: center;
+}
+.modal-btn-icon:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.modal-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 20px;
+  padding: 10px 16px;
   border-radius: 8px;
-  border: none;
-  background-color: var(--accent);
-  color: #fff;
   font-size: 13px;
   font-weight: 500;
+  border: 1px solid var(--border);
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
   cursor: pointer;
-  transition: opacity 150ms ease;
+  transition: background-color 100ms ease;
 }
-.save-btn:hover {
+.modal-btn:hover {
+  background-color: var(--bg-hover);
+}
+.modal-btn.primary {
+  background-color: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+.modal-btn.primary:hover {
   opacity: 0.9;
 }
-.save-btn:disabled {
-  opacity: 0.6;
+
+.modal-btns {
+  align-self: flex-start;
 }
 
-.clash-editor-modal {
-  width: 90%;
-  max-width: 800px;
-  height: 80vh;
+.color-grid {
   display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
-  overflow: hidden;
+  gap: 8px;
 }
 
-.clash-editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
+.color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all 150ms ease;
 }
-
-.clash-editor-textarea {
-  flex: 1;
-  width: 100%;
-  padding: 16px;
-  font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  resize: none;
-  outline: none;
-  border: none;
-  background-color: transparent;
-  color: var(--text-primary);
-  tab-size: 2;
+.color-swatch:hover {
+  transform: scale(1.15);
 }
-
-.spin {
-  animation: spin 1s linear infinite;
-}
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.color-swatch.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 0 2px var(--card-bg);
 }
 </style>

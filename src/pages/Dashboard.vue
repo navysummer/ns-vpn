@@ -1,30 +1,19 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import { useToast } from "@/utils/toast";
+import { useAppStore } from "@/stores/app";
+import { useI18n } from "vue-i18n";
 import SubscriptionCard from "@/components/home/SubscriptionCard.vue";
 import CurrentNodeCard from "@/components/home/CurrentNodeCard.vue";
 import NetworkSettingsCard from "@/components/home/NetworkSettingsCard.vue";
 import TrafficStatsCard from "@/components/home/TrafficStatsCard.vue";
 import WebsiteTestCard from "@/components/home/WebsiteTestCard.vue";
 import IpInfoCard from "@/components/home/IpInfoCard.vue";
-import ClashInfoCard from "@/components/home/ClashInfoCard.vue";
+import CoreInfoCard from "@/components/home/CoreInfoCard.vue";
 import SystemInfoCard from "@/components/home/SystemInfoCard.vue";
 
-const { show } = useToast();
+const app = useAppStore();
+const { t } = useI18n();
 const loading = ref(true);
-const proxyMode = ref<"rule" | "global" | "direct">("global");
-
-const modeDescriptions: Record<string, string> = {
-  rule: "根据规则进行分流，推荐大部分用户使用",
-  global: "所有流量均通过代理服务器，适用于需要全局科学上网的场景",
-  direct: "所有流量直连，不使用代理服务器",
-};
-
-function setProxyMode(mode: "rule" | "global" | "direct") {
-  proxyMode.value = mode;
-  const labels = { rule: "规则", global: "全局", direct: "直连" };
-  show(`已切换到${labels[mode]}模式`, "info");
-}
 
 onMounted(() => {
   setTimeout(() => { loading.value = false; }, 300);
@@ -34,11 +23,11 @@ onMounted(() => {
 <template>
   <div class="dashboard-page">
     <div class="dashboard-header">
-      <h1 class="dashboard-title">首页</h1>
+      <h1 class="dashboard-title">{{ t('dashboard.title') }}</h1>
     </div>
 
     <div v-if="loading" class="flex items-center justify-center py-20" :style="{ color: 'var(--text-secondary)' }">
-      <div class="spin">加载中...</div>
+      <div class="spin">{{ t('common.loading') }}</div>
     </div>
 
     <template v-else>
@@ -55,46 +44,46 @@ onMounted(() => {
               <div class="pmc-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4"/><path d="M12 16V8"/></svg>
               </div>
-              <span class="pmc-title">代理模式</span>
+              <span class="pmc-title">{{ t('dashboard.proxyMode') }}</span>
             </div>
             <div class="pmc-body">
               <div class="pmc-modes">
                 <button
                   class="pmc-mode-btn"
-                  :class="{ 'pmc-mode-active': proxyMode === 'rule' }"
-                  @click="setProxyMode('rule')"
+                  :class="{ 'pmc-mode-active': app.proxyMode === 'rule' }"
+                  @click="app.changeProxyMode('rule')"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                   <div>
-                    <div class="pmc-mode-label">规则</div>
-                    <div class="pmc-mode-desc">按规则分流</div>
+                    <div class="pmc-mode-label">{{ t('dashboard.ruleMode') }}</div>
+                    <div class="pmc-mode-desc">{{ t('dashboard.ruleModeDesc') }}</div>
                   </div>
                 </button>
                 <button
                   class="pmc-mode-btn"
-                  :class="{ 'pmc-mode-active': proxyMode === 'global' }"
-                  @click="setProxyMode('global')"
+                  :class="{ 'pmc-mode-active': app.proxyMode === 'global' }"
+                  @click="app.changeProxyMode('global')"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m2 12 10 10 10-10"/><path d="m2 12 10-10 10 10"/></svg>
                   <div>
-                    <div class="pmc-mode-label">全局</div>
-                    <div class="pmc-mode-desc">全部走代理</div>
+                    <div class="pmc-mode-label">{{ t('dashboard.globalMode') }}</div>
+                    <div class="pmc-mode-desc">{{ t('dashboard.globalModeDesc') }}</div>
                   </div>
                 </button>
                 <button
                   class="pmc-mode-btn"
-                  :class="{ 'pmc-mode-active': proxyMode === 'direct' }"
-                  @click="setProxyMode('direct')"
+                  :class="{ 'pmc-mode-active': app.proxyMode === 'direct' }"
+                  @click="app.changeProxyMode('direct')"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>
                   <div>
-                    <div class="pmc-mode-label">直连</div>
-                    <div class="pmc-mode-desc">不使用代理</div>
+                    <div class="pmc-mode-label">{{ t('dashboard.directMode') }}</div>
+                    <div class="pmc-mode-desc">{{ t('dashboard.directModeDesc') }}</div>
                   </div>
                 </button>
               </div>
               <div class="pmc-hint">
-                {{ modeDescriptions[proxyMode] }}
+                {{ t(`dashboard.${app.proxyMode}ModeHint`) }}
               </div>
             </div>
           </div>
@@ -110,7 +99,7 @@ onMounted(() => {
         </div>
 
         <div class="grid-info">
-          <ClashInfoCard />
+          <CoreInfoCard />
           <SystemInfoCard />
         </div>
       </div>
