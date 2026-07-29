@@ -18,12 +18,7 @@ interface Profile {
   nodes: number;
 }
 
-const profiles = ref<Profile[]>([
-  { name: "config.yaml", type: "local", active: true, updated: "2026-01-15 14:30", nodes: 45 },
-  { name: "机场订阅", type: "remote", url: "https://example.com/sub", active: false, updated: "2026-01-14 10:00", nodes: 32 },
-  { name: "规则合并", type: "merge", active: false, updated: "2026-01-13 09:15", nodes: 0 },
-  { name: "自定义脚本", type: "script", active: false, updated: "2026-01-12 16:45", nodes: 0 },
-]);
+const profiles = ref<Profile[]>([]);
 
 const showAddDialog = ref(false);
 const showDeleteDialog = ref(false);
