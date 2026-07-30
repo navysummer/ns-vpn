@@ -31,9 +31,31 @@ tauri-plugin-autostart = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml_ng = "0.9"
+serde_yaml = "0.9"
 tokio = { version = "1", features = ["full"] }
 parking_lot = "0.12"
 log = "0.4"
 opener = "0.7"
 reqwest = { version = "0.12", features = ["json"] }
 dirs = "6"
+base64 = "0.22"
+flate2 = "1"
+meow-app = { version = "0.19", default-features = false, features = [
+  "full",
+] }
+meow-config = { version = "0.19", default-features = false, features = [
+  "ss", "trojan", "vmess", "vless", "vless-vision", "vless-encryption",
+  "snell", "hysteria2",
+] }
+meow-tunnel = "0.19"
+meow-dns = { version = "0.19", default-features = false, features = [
+  "dns-server", "encrypted",
+] }
+meow-api = "0.19"
+meow-common = "0.19"
+meow-listener = { version = "0.19", default-features = false, features = [
+  "listener-mixed", "listener-http", "listener-socks5",
+] }
+sysinfo = "0.38"
+dashmap = "6"
+uuid = { version = "1", features = ["v4"] }

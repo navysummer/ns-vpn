@@ -20,5 +20,6 @@ CLAUDE.md
 AGENTS.md
 .zed
 
-# hex-named cargo artifact dirs
-[0-9a-f]*/
+# hex-named cargo artifact dirs (scoped to target)
+target/[0-9a-f]*/
+src-tauri/binaries/

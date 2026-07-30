@@ -59,6 +59,34 @@ export const stopCore = () => tauriInvoke("stop_core");
 export const restartCore = () => tauriInvoke("restart_core");
 export const getCoreStatus = () => tauriInvoke<CoreStatus>("get_core_status");
 
+// ---- Core Download ----
+export interface CoreInfo {
+  versions: string[];
+  default: string;
+  hasCore: boolean;
+  corePath: string;
+}
+
+export interface CoreVersionInfo {
+  version: string;
+  is_default: boolean;
+}
+
+export const downloadCore = (channel?: string) =>
+  tauriInvoke<string>("download_core", { channel });
+export const checkCoreInstalled = () => tauriInvoke<CoreInfo>("check_core_installed");
+export const listCoreVersions = () => tauriInvoke<CoreVersionInfo[]>("list_core_versions");
+export const installCoreVersion = (version: string) =>
+  tauriInvoke<string>("install_core_version", { version });
+export const uninstallCoreVersion = (version: string) =>
+  tauriInvoke("uninstall_core_version", { version });
+export const setCoreDefaultVersion = (version: string) =>
+  tauriInvoke("set_core_default_version", { version });
+export const getCoreDefaultVersion = () =>
+  tauriInvoke<string>("get_core_default_version");
+export const installCoreWithProgress = () =>
+  tauriInvoke("install_core_with_progress");
+
 // ---- Proxy ----
 export interface ProxyStatus {
   running: boolean;
@@ -168,3 +196,11 @@ export interface RuleInfo {
 }
 
 export const getRules = () => tauriInvoke<RuleInfo[]>("get_rules");
+
+// ---- Subscription ----
+export const applySubscription = (content: string, format: string) =>
+  tauriInvoke("apply_subscription", { content, format });
+export const fetchSubscriptionUrl = (url: string) =>
+  tauriInvoke<string>("fetch_subscription_url", { url });
+export const convertContent = (content: string, format: string) =>
+  tauriInvoke<string>("convert_content", { content, format });

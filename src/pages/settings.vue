@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { ChevronRight, X, RotateCw, ExternalLink, FolderOpen, Copy, Trash2, Download, Upload } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useToast } from "@/utils/toast";
 import { useI18n } from "vue-i18n";
+import { listCoreVersions, installCoreVersion, uninstallCoreVersion, setCoreDefaultVersion, type CoreVersionInfo } from "@/utils/tauri";
 
 const app = useAppStore();
 const { show } = useToast();
@@ -84,6 +85,10 @@ function openDevTools() {
 function openLiteMode() {
   openPanel("liteMode");
 }
+function openCoreVersions() {
+  loadVersions();
+  openPanel("coreVersions");
+}
 function exitApp() {
   show(t("settings.fileSelectorHint"), "info");
 }
@@ -107,6 +112,52 @@ function copyConfigPath() {
   show(t("settings.fileSelectorHint"), "info");
 }
 
+// ---- Core Version Management ----
+const versions = ref<CoreVersionInfo[]>([]);
+const installingVersion = ref(false);
+const installVersionInput = ref("");
+
+async function loadVersions() {
+  try {
+    versions.value = await listCoreVersions();
+  } catch {
+    versions.value = [];
+  }
+}
+async function doInstallVersion() {
+  const ver = installVersionInput.value.trim();
+  if (!ver) return;
+  installingVersion.value = true;
+  try {
+    await installCoreVersion(ver);
+    show(t("settings.versionInstalled", { version: ver }), "success");
+    installVersionInput.value = "";
+    await loadVersions();
+  } catch (e: any) {
+    show(e?.toString() || t("common.error"), "error");
+  } finally {
+    installingVersion.value = false;
+  }
+}
+async function doUninstallVersion(ver: string) {
+  try {
+    await uninstallCoreVersion(ver);
+    show(t("settings.versionUninstalled", { version: ver }), "success");
+    await loadVersions();
+  } catch (e: any) {
+    show(e?.toString() || t("common.error"), "error");
+  }
+}
+async function doSetDefault(ver: string) {
+  try {
+    await setCoreDefaultVersion(ver);
+    show(t("settings.defaultChanged", { version: ver }), "success");
+    await loadVersions();
+  } catch (e: any) {
+    show(e?.toString() || t("common.error"), "error");
+  }
+}
+
 const panelTitle = computed(() => {
   const key = activePanel.value;
   if (!key) return "";
@@ -122,6 +173,7 @@ const panelTitle = computed(() => {
     backupSettings: "settings.backupSettings",
     currentConfig: "settings.currentConfig",
     liteMode: "settings.liteMode",
+    coreVersions: "settings.coreVersions",
   };
   return map[key] ?? key;
 });
@@ -264,6 +316,12 @@ const panelTitle = computed(() => {
           <div class="setting-row setting-row-link" @click="openTrafficTunnel">
             <div class="setting-left">
               <span class="setting-label">{{ t('settings.trafficTunnel') }}</span>
+            </div>
+            <ChevronRight :size="16" class="setting-arrow" />
+          </div>
+          <div class="setting-row setting-row-link" @click="openCoreVersions">
+            <div class="setting-left">
+              <span class="setting-label">{{ t('settings.coreVersions') }}</span>
             </div>
             <ChevronRight :size="16" class="setting-arrow" />
           </div>
@@ -513,6 +571,36 @@ const panelTitle = computed(() => {
                 <label class="modal-label">{{ t('settings.allowLan') }}</label>
                 <div class="toggle" :class="{ active: app.allowLan }" @click="app.allowLan = !app.allowLan">
                   <div class="toggle-knob"></div>
+                </div>
+              </div>
+            </template>
+
+            <!-- Core Versions -->
+            <template v-if="activePanel === 'coreVersions'">
+              <div class="modal-desc">{{ t('settings.coreVersions') }}</div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.installVersion') }}</label>
+                <div class="modal-row">
+                  <input v-model="installVersionInput" class="modal-input" :placeholder="t('settings.installVersionHint')" @keydown.enter="doInstallVersion" />
+                  <button class="modal-btn-primary" :disabled="installingVersion || !installVersionInput.trim()" @click="doInstallVersion">
+                    {{ installingVersion ? t('settings.installing') : t('settings.installVersion') }}
+                  </button>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.installedVersions') }}</label>
+                <div v-if="versions.length === 0" class="modal-text">{{ t('settings.noVersions') }}</div>
+                <div v-else class="version-list">
+                  <div v-for="v in versions" :key="v.version" class="version-item">
+                    <div class="version-info">
+                      <span class="version-name">{{ v.version }}</span>
+                      <span v-if="v.is_default" class="version-badge">{{ t('settings.currentDefault') }}</span>
+                    </div>
+                    <div class="version-actions">
+                      <button v-if="!v.is_default" class="modal-btn-sm" @click="doSetDefault(v.version)">{{ t('settings.setDefault') }}</button>
+                      <button v-if="!v.is_default" class="modal-btn-sm danger" @click="doUninstallVersion(v.version)">{{ t('settings.uninstall') }}</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </template>
@@ -1019,5 +1107,85 @@ const panelTitle = computed(() => {
 .color-swatch.active {
   border-color: var(--text-primary);
   box-shadow: 0 0 0 2px var(--card-bg);
+}
+
+/* Version Management */
+.modal-btn-primary {
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: none;
+  background-color: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 100ms ease;
+}
+.modal-btn-primary:hover:not(:disabled) { opacity: 0.9; }
+.modal-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.version-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border);
+}
+
+.version-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.version-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background-color: var(--accent);
+  color: #fff;
+}
+
+.version-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.modal-btn-sm {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 100ms ease;
+}
+.modal-btn-sm:hover {
+  background-color: var(--bg-hover);
+}
+.modal-btn-sm.danger {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+.modal-btn-sm.danger:hover {
+  background-color: rgba(239,68,68,0.1);
 }
 </style>

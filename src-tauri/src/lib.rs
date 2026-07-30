@@ -41,6 +41,14 @@ pub fn run() {
             commands::core_cmd::stop_core,
             commands::core_cmd::restart_core,
             commands::core_cmd::get_core_status,
+            commands::core_download::download_core,
+            commands::core_download::check_core_installed,
+            commands::core_download::list_core_versions,
+            commands::core_download::install_core_version,
+            commands::core_download::uninstall_core_version,
+            commands::core_download::set_core_default_version,
+            commands::core_download::get_core_default_version,
+            commands::core_download::install_core_with_progress,
             commands::proxy::get_proxy_status,
             commands::proxy::set_system_proxy,
             commands::proxy::set_tun_mode,
@@ -57,6 +65,9 @@ pub fn run() {
             commands::connections::close_connection,
             commands::connections::close_all_connections,
             commands::rules::get_rules,
+            commands::subscription::apply_subscription,
+            commands::subscription::fetch_subscription_url,
+            commands::subscription::convert_content,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
