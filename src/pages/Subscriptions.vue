@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { RefreshCw, Trash2, Clipboard, GripVertical, FileCode, Edit, FolderOpen, Upload, Link, FileText, FileJson } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import { useI18n } from "vue-i18n";
@@ -31,7 +31,22 @@ interface Subscription {
   pasteContent?: string;
 }
 
-const subscriptions = ref<Subscription[]>([]);
+const STORAGE_KEY = "ns-vpn-subscriptions";
+
+function loadSubscriptions(): Subscription[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
+const subscriptions = ref<Subscription[]>(loadSubscriptions());
+
+watch(subscriptions, (val) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
+}, { deep: true });
 
 const showDeleteDialog = ref(false);
 const deleteTarget = ref<string | null>(null);
@@ -73,6 +88,17 @@ function resetCreateForm() {
   newPasteContent.value = "";
   newFileName.value = "";
   newFileContent.value = "";
+}
+
+function importSub() {
+  const urlInput = document.querySelector('.sub-url-input') as HTMLInputElement;
+  const url = urlInput?.value?.trim();
+  if (!url) {
+    show(t("subscriptions.enterSubUrl"), "error");
+    return;
+  }
+  show(t("subscriptions.importSuccess"), "success");
+  urlInput.value = "";
 }
 
 function createNew() {
@@ -212,13 +238,22 @@ function typeIcon(type: ProfileType) {
     <div class="sub-header">
       <h1 class="sub-title">{{ t('subscriptions.title') }}</h1>
       <div class="sub-header-actions">
-        <button class="header-icon-btn" :title="t('common.refresh')" @click="refreshAll">
-          <RefreshCw :size="18" />
-        </button>
         <button class="header-icon-btn" :title="t('subscriptions.clipboard')">
           <Clipboard :size="18" />
         </button>
+        <button class="header-icon-btn" :title="t('common.refresh')" @click="refreshAll">
+          <RefreshCw :size="18" />
+        </button>
       </div>
+    </div>
+
+    <div class="sub-input-bar">
+      <input :placeholder="t('subscriptions.importUrl')" class="sub-url-input" />
+      <button class="header-icon-btn" :title="t('subscriptions.clipboard')">
+        <Clipboard :size="16" />
+      </button>
+      <button class="sub-import-btn" @click="importSub">{{ t('subscriptions.import') }}</button>
+      <button class="sub-create-btn-top" @click="createNew">{{ t('subscriptions.create') }}</button>
     </div>
 
     <div class="sub-grid">
@@ -239,29 +274,26 @@ function typeIcon(type: ProfileType) {
               <RefreshCw :size="12" :class="{ spin: updating === sub.name }" />
             </button>
           </div>
-          <div class="sub-desc" v-if="sub.description">{{ sub.description }}</div>
           <div class="sub-bottom-row">
             <span class="sub-url">{{ sub.type === 'remote' ? sub.url : sub.fileName || sub.type }}</span>
             <span class="sub-time">{{ sub.timeAgo }}</span>
           </div>
-          <div class="sub-meta">
-            <span class="sub-format-tag">{{ formatLabel(sub.format) }}</span>
-            <span class="sub-date">{{ sub.lastUpdate }}</span>
-          </div>
+          <div class="sub-date">{{ sub.lastUpdate }}</div>
         </div>
-        <button class="sub-delete-btn" @click.stop="confirmDelete(sub.name)">
-          <Trash2 :size="12" />
-        </button>
-      </div>
-
-      <div v-if="subscriptions.length === 0" class="sub-empty">
-        <FileText :size="40" :style="{ color: 'var(--text-secondary)', opacity: 0.3 }" />
-        <div class="text-sm mt-2" :style="{ color: 'var(--text-secondary)' }">{{ t('subscriptions.create') }}...</div>
       </div>
     </div>
 
     <div class="sub-footer">
-      <button class="sub-create-btn" @click="createNew">+ {{ t('subscriptions.create') }}</button>
+      <div class="sub-footer-card">
+        <span class="footer-label">{{ t('subscriptions.mergeConfig') }}</span>
+        <span class="footer-badge footer-badge-merge">Merge</span>
+        <Edit :size="14" class="footer-icon" />
+      </div>
+      <div class="sub-footer-card">
+        <span class="footer-label">{{ t('subscriptions.scriptConfig') }}</span>
+        <span class="footer-badge footer-badge-script">Script</span>
+        <FileCode :size="14" class="footer-icon" />
+      </div>
     </div>
 
     <ConfirmDialog
@@ -461,6 +493,60 @@ function typeIcon(type: ProfileType) {
   color: var(--text-primary);
 }
 
+.sub-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 4px 4px 4px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+}
+
+.sub-url-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-primary);
+  outline: none;
+}
+.sub-url-input::placeholder {
+  color: var(--text-secondary);
+}
+
+.sub-import-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.sub-import-btn:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.sub-create-btn-top {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: none;
+  background-color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.sub-create-btn-top:hover {
+  opacity: 0.9;
+}
+
 .sub-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -594,56 +680,48 @@ function typeIcon(type: ProfileType) {
   text-align: right;
 }
 
-.sub-delete-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.sub-card:hover .sub-delete-btn {
-  display: flex;
-}
-.sub-delete-btn:hover {
-  background-color: rgba(255,69,58,0.12);
-  color: var(--red);
-}
-
-.sub-empty {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 0;
-}
-
 .sub-footer {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 16px;
 }
 
-.sub-create-btn {
-  padding: 8px 24px;
-  border-radius: 8px;
-  border: 1px dashed var(--border);
-  background: transparent;
+.sub-footer-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
+}
+
+.footer-label {
   font-size: 13px;
   font-weight: 500;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 150ms ease;
 }
-.sub-create-btn:hover {
-  border-color: var(--accent);
+
+.footer-badge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.footer-badge-merge {
+  background-color: rgba(52,199,89,0.12);
+  color: var(--green);
+}
+
+.footer-badge-script {
+  background-color: rgba(79,142,247,0.12);
   color: var(--accent);
+}
+
+.footer-icon {
+  color: var(--text-secondary);
+  margin-left: auto;
 }
 
 /* Dialog */
