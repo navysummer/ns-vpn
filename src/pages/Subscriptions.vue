@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onMounted, onUnmounted } from "vue";
 import { RefreshCw, Trash2, Clipboard, GripVertical, FileCode, Edit, FolderOpen, Upload, Link, FileText, FileJson, ArrowDownToLine, ArrowUpFromLine, Search, X, Plus } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import { useI18n } from "vue-i18n";
+import { useAppStore } from "@/stores/app";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
 import QrViewer from "@/components/QrViewer.vue";
@@ -10,6 +11,10 @@ import { applySubscription, fetchSubscriptionUrl, openAppDir, convertContent } f
 
 const { show } = useToast();
 const { t } = useI18n();
+const app = useAppStore();
+const ACTIVE_KEY = "ns-vpn-active-sub";
+const activeSubId = ref(localStorage.getItem(ACTIVE_KEY));
+const selectedSub = ref<string | null>(activeSubId.value);
 
 type ConfigFormat = "clash" | "v2rayn" | "singbox" | "openvpn";
 type ProfileType = "remote" | "local" | "script";
@@ -50,6 +55,57 @@ function loadSubscriptions(): Subscription[] {
 
 const subscriptions = ref<Subscription[]>(loadSubscriptions());
 
+const searchQuery = ref("");
+const filterFormat = ref<string[]>(["all"]);
+const showFilterPanel = ref(false);
+const formatOptions = [
+  { label: t("subscriptions.formatClash"), value: "clash" },
+  { label: t("subscriptions.formatV2rayN"), value: "v2rayn" },
+  { label: t("subscriptions.formatSingbox"), value: "singbox" },
+  { label: t("subscriptions.formatOpenvpn"), value: "openvpn" },
+];
+
+const filterLabel = computed(() => {
+  if (filterFormat.value.includes("all") || filterFormat.value.length === 0) return t("common.all");
+  return filterFormat.value.map(v => formatOptions.find(o => o.value === v)?.label || v).join(", ");
+});
+
+function toggleFilter(value: string) {
+  if (value === "all") {
+    filterFormat.value = ["all"];
+    return;
+  }
+  const current = filterFormat.value.filter(v => v !== "all");
+  const idx = current.indexOf(value);
+  if (idx >= 0) {
+    current.splice(idx, 1);
+  } else {
+    current.push(value);
+  }
+  filterFormat.value = current.length === 0 ? ["all"] : current;
+}
+
+function onFilterClickOutside(e: MouseEvent) {
+  const target = e.target as HTMLElement;
+  if (!target.closest(".sub-filter-dropdown")) {
+    showFilterPanel.value = false;
+  }
+}
+
+onMounted(() => document.addEventListener("click", onFilterClickOutside));
+onUnmounted(() => document.removeEventListener("click", onFilterClickOutside));
+
+const filteredSubscriptions = computed(() => {
+  return subscriptions.value.filter(sub => {
+    if (!filterFormat.value.includes("all") && !filterFormat.value.includes(sub.format)) return false;
+    if (searchQuery.value) {
+      const q = searchQuery.value.toLowerCase();
+      return sub.name.toLowerCase().includes(q) || sub.url.toLowerCase().includes(q);
+    }
+    return true;
+  });
+});
+
 watch(subscriptions, (val) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(val));
 }, { deep: true });
@@ -57,17 +113,12 @@ watch(subscriptions, (val) => {
 const showDeleteDialog = ref(false);
 const deleteTarget = ref<Subscription | null>(null);
 const updating = ref<string | null>(null);
-const selectedSub = ref<string | null>(null);
 
 const showContextMenu = ref(false);
 const contextMenuX = ref(0);
 const contextMenuY = ref(0);
 const contextMenuTarget = ref<Subscription | null>(null);
 const contextMenuItems = ref<{ label: string; danger?: boolean; divider?: boolean }[]>([]);
-
-const barUrl = ref("");
-const barFormat = ref<ConfigFormat>("clash");
-const barImporting = ref(false);
 
 const showCreateDialog = ref(false);
 const newName = ref("");
@@ -104,73 +155,6 @@ function resetCreateForm() {
   newPasteContent.value = "";
   newFileName.value = "";
   newFileContent.value = "";
-}
-
-async function importSub() {
-  const url = barUrl.value.trim();
-  if (!url) {
-    show(t("subscriptions.enterSubUrl"), "error");
-    return;
-  }
-  barImporting.value = true;
-  try {
-    const rawContent = await fetchSubscriptionUrl(url);
-    const isClash = barFormat.value === "clash";
-    let clashContent: string;
-    let raw: string | undefined;
-    if (isClash) {
-      clashContent = rawContent;
-      raw = undefined;
-    } else {
-      raw = rawContent;
-      try {
-        clashContent = await convertContent(rawContent, barFormat.value);
-      } catch (e: any) {
-        clashContent = rawContent;
-        show(`${t('subscriptions.importSuccess')}，${t('subscriptions.convertFailed') || '格式转换失败，将使用原始内容'}: ${e}`, "info");
-      }
-    }
-    const sub = {
-      id: crypto.randomUUID(),
-      name: url.split("/").pop() || url.slice(0, 30),
-      description: "",
-      type: "remote" as ProfileType,
-      url,
-      format: barFormat.value,
-      userAgent: "",
-      httpTimeout: 10,
-      updateInterval: 120,
-      useSystemProxy: false,
-      useCoreProxy: false,
-      allowInsecure: false,
-      allowAutoUpdate: false,
-      lastUpdate: new Date().toISOString().split("T")[0],
-      timeAgo: t("subscriptions.justNow"),
-      rawContent: raw,
-      fileContent: clashContent,
-    };
-    subscriptions.value = [...subscriptions.value, sub];
-    try {
-      await applySubscription(clashContent, "clash");
-    } catch (e: any) {
-      show(`${t('subscriptions.importSuccess')}，${t('subscriptions.applyFailed') || '但应用失败'}: ${e}`, "info");
-    }
-    show(t("subscriptions.importSuccess"), "success");
-    barUrl.value = "";
-  } catch (e: any) {
-    show(`${e}`, "error");
-  } finally {
-    barImporting.value = false;
-  }
-}
-
-async function pasteFromClipboard() {
-  try {
-    const text = await navigator.clipboard.readText();
-    if (text) barUrl.value = text;
-  } catch {
-    show(t("subscriptions.clipboard"), "error");
-  }
 }
 
 function createNew() {
@@ -310,6 +294,8 @@ const applying = ref<string | null>(null);
 
 async function applySub(sub: Subscription) {
   selectedSub.value = sub.id;
+  activeSubId.value = sub.id;
+  localStorage.setItem(ACTIVE_KEY, sub.id);
   applying.value = sub.id;
   try {
     let content = sub.fileContent || sub.pasteContent || "";
@@ -324,10 +310,14 @@ async function applySub(sub: Subscription) {
       show(t("subscriptions.enterSubUrl"), "error");
       return;
     }
+    if (app.overrideMergeContent && app.overrideMergeContent !== "# override config") {
+      content = content + "\n" + app.overrideMergeContent;
+    }
     await applySubscription(content, "clash");
     sub.lastUpdate = new Date().toISOString().split("T")[0];
     sub.timeAgo = t("subscriptions.justNow");
     show(t("subscriptions.switchedTo", { name: sub.name }), "success");
+    localStorage.setItem("ns-vpn-active-sub", sub.id);
   } catch (e: any) {
     show(`${sub.name}: ${e}`, "error");
   } finally {
@@ -553,6 +543,9 @@ function parseRulesFromYaml(yaml: string): ParsedRule[] {
       }
     }
   }
+  if (result.length === 0) {
+    result.push({ type: "MATCH", content: "", proxy: "Proxy" });
+  }
   return result;
 }
 
@@ -678,8 +671,8 @@ async function openEditSection(sub: Subscription, section: string) {
   const sectionContent = extractSection(content, section);
   switch (section) {
     case "rules":
-      parsedFormat.value = sub.format;
-      parsedRules.value = parseRules(content, sub.format);
+      parsedFormat.value = "clash";
+      parsedRules.value = parseRules(sub.fileContent || content, "clash");
       ruleFilter.value = "";
       showEditRules.value = true;
       break;
@@ -758,16 +751,26 @@ async function doEditGroups() {
   showEditGroups.value = false;
 }
 
+function openOverrideMerge() {
+  editMergeContent.value = app.overrideMergeContent;
+  showEditMerge.value = true;
+}
+
+function openOverrideScript() {
+  editScriptContent.value = app.overrideScriptContent;
+  showEditScript.value = true;
+}
+
 async function doEditMerge() {
-  if (!editFileTarget.value) return;
-  await saveSection(editFileTarget.value, "merge", editMergeContent.value);
+  app.overrideMergeContent = editMergeContent.value;
   showEditMerge.value = false;
+  show(t("subscriptions.save") + ": " + t("subscriptions.mergeConfig"), "success");
 }
 
 async function doEditScript() {
-  if (!editFileTarget.value) return;
-  await saveSection(editFileTarget.value, "script", editScriptContent.value);
+  app.overrideScriptContent = editScriptContent.value;
   showEditScript.value = false;
+  show(t("subscriptions.save") + ": " + t("subscriptions.scriptConfig"), "success");
 }
 
 const editFilePlaceholder = computed(() => {
@@ -914,9 +917,7 @@ function typeIcon(type: ProfileType) {
     <div class="sub-header">
       <h1 class="sub-title">{{ t('subscriptions.title') }} <span class="sub-count">{{ subscriptions.length }}</span></h1>
       <div class="sub-header-actions">
-        <button class="header-icon-btn" :title="t('subscriptions.clipboard')">
-          <Clipboard :size="18" />
-        </button>
+        <button class="sub-create-btn-top" @click="createNew">{{ t('subscriptions.create') }}</button>
         <button class="header-icon-btn" :title="t('common.refresh')" @click="refreshAll">
           <RefreshCw :size="18" />
         </button>
@@ -926,27 +927,34 @@ function typeIcon(type: ProfileType) {
       </div>
     </div>
 
-    <div class="sub-input-bar">
-      <input v-model="barUrl" :placeholder="t('subscriptions.importUrl')" class="sub-url-input" @keydown.enter="importSub" />
-      <button class="header-icon-btn" :title="t('subscriptions.clipboard')" @click="pasteFromClipboard">
-        <Clipboard :size="16" />
+    <div class="sub-search-row">
+      <input v-model="searchQuery" :placeholder="t('common.search') + '...'" class="sub-search-input" />
+      <div class="sub-filter-dropdown">
+        <button class="sub-filter-btn" @click="showFilterPanel = !showFilterPanel">
+          {{ filterLabel }}
+          <span v-if="filterFormat.length > 0 && !filterFormat.includes('all')" class="filter-badge">{{ filterFormat.length }}</span>
+        </button>
+        <div v-if="showFilterPanel" class="filter-panel">
+          <label class="filter-option">
+            <input type="checkbox" value="all" :checked="filterFormat.includes('all')" @change="toggleFilter('all')" />
+            <span>{{ t('common.all') }}</span>
+          </label>
+          <label class="filter-option" v-for="opt in formatOptions" :key="opt.value">
+            <input type="checkbox" :value="opt.value" :checked="filterFormat.includes(opt.value)" @change="toggleFilter(opt.value)" />
+            <span>{{ opt.label }}</span>
+          </label>
+        </div>
+      </div>
+      <button class="header-icon-btn" :title="t('common.search')">
+        <Search :size="16" />
       </button>
-      <select v-model="barFormat" class="bar-format-select">
-        <option value="clash">Clash</option>
-        <option value="v2rayn">v2rayN</option>
-        <option value="singbox">Sing-box</option>
-        <option value="openvpn">OpenVPN</option>
-      </select>
-      <button class="sub-import-btn" :disabled="barImporting" @click="importSub">
-        <RefreshCw v-if="barImporting" :size="12" class="spin" />
-        {{ t('subscriptions.import') }}
-      </button>
-      <button class="sub-create-btn-top" @click="createNew">{{ t('subscriptions.create') }}</button>
+    </div>
+    <div class="sub-actions-row">
     </div>
 
     <div class="sub-grid">
       <div
-        v-for="(sub, idx) in subscriptions"
+        v-for="(sub, idx) in filteredSubscriptions"
         :key="'grid-' + sub.id + '-' + idx"
         class="sub-card"
         :class="{ 'sub-card-active': selectedSub === sub.id, 'sub-card-applying': applying === sub.id }"
@@ -976,12 +984,12 @@ function typeIcon(type: ProfileType) {
     </div>
 
     <div class="sub-footer">
-      <div class="sub-footer-card">
+      <div class="sub-footer-card" @click="openOverrideMerge">
         <span class="footer-label">{{ t('subscriptions.mergeConfig') }}</span>
         <span class="footer-badge footer-badge-merge">Merge</span>
         <Edit :size="14" class="footer-icon" />
       </div>
-      <div class="sub-footer-card">
+      <div class="sub-footer-card" @click="openOverrideScript">
         <span class="footer-label">{{ t('subscriptions.scriptConfig') }}</span>
         <span class="footer-badge footer-badge-script">Script</span>
         <FileCode :size="14" class="footer-icon" />
@@ -1331,7 +1339,7 @@ function typeIcon(type: ProfileType) {
       <Transition name="page">
         <div v-if="showEditMerge" class="fixed inset-0 flex items-center justify-center bg-black/50 z-50" @click="showEditMerge = false">
           <div class="create-dialog" :style="{ backgroundColor: 'var(--bg-secondary)' }" @click.stop>
-            <h3 class="dialog-title">{{ t('subscriptions.ctxOverrideConfig') }} — {{ editFileTarget?.name }}</h3>
+            <h3 class="dialog-title">{{ t('subscriptions.mergeConfig') }}</h3>
             <div class="dialog-body">
               <div class="field">
                 <span class="field-label">{{ t('subscriptions.ctxOverrideConfig') }}</span>
@@ -1351,7 +1359,7 @@ function typeIcon(type: ProfileType) {
       <Transition name="page">
         <div v-if="showEditScript" class="fixed inset-0 flex items-center justify-center bg-black/50 z-50" @click="showEditScript = false">
           <div class="create-dialog" :style="{ backgroundColor: 'var(--bg-secondary)' }" @click.stop>
-            <h3 class="dialog-title">{{ t('subscriptions.ctxOverrideScript') }} — {{ editFileTarget?.name }}</h3>
+            <h3 class="dialog-title">{{ t('subscriptions.scriptConfig') }}</h3>
             <div class="dialog-body">
               <div class="field">
                 <span class="field-label">{{ t('subscriptions.ctxOverrideScript') }}</span>
@@ -1374,6 +1382,10 @@ function typeIcon(type: ProfileType) {
 <style scoped>
 .sub-page {
   max-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .sub-header {
@@ -1381,6 +1393,7 @@ function typeIcon(type: ProfileType) {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  flex-shrink: 0;
 }
 
 .sub-title {
@@ -1429,31 +1442,34 @@ function typeIcon(type: ProfileType) {
   color: var(--red);
 }
 
-.sub-input-bar {
+.sub-search-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
-  padding: 4px 4px 4px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background-color: var(--card-bg);
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
-.sub-url-input {
-  flex: 1;
-  border: none;
-  background: transparent;
+.sub-search-input {
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--card-bg);
   font-size: 13px;
   color: var(--text-primary);
   outline: none;
+  transition: border-color 150ms;
 }
-.sub-url-input::placeholder {
+.sub-search-input:focus {
+  border-color: var(--accent);
+}
+.sub-search-input::placeholder {
   color: var(--text-secondary);
 }
 
-.bar-format-select {
-  padding: 5px 8px;
+.sub-filter-select {
+  padding: 5px 10px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: transparent;
@@ -1461,29 +1477,93 @@ function typeIcon(type: ProfileType) {
   color: var(--text-secondary);
   cursor: pointer;
   outline: none;
+  min-width: 100px;
+  max-height: 120px;
 }
-.bar-format-select:focus {
+.sub-filter-select:focus {
   border-color: var(--accent);
 }
 
-.sub-import-btn {
-  padding: 6px 16px;
-  border-radius: 6px;
+.sub-filter-dropdown {
+  position: relative;
+}
+
+.sub-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 8px;
   border: 1px solid var(--border);
   background: transparent;
   font-size: 13px;
-  font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
   transition: all 150ms ease;
 }
-.sub-import-btn:hover {
+.sub-filter-btn:hover {
   border-color: var(--accent);
   color: var(--text-primary);
 }
-.sub-import-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background-color: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.filter-panel {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 160px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background 150ms;
+}
+.filter-option:hover {
+  background-color: var(--bg-hover);
+}
+.filter-option input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+.sub-filter-select option {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.sub-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .edit-file-header {
@@ -1519,7 +1599,11 @@ function typeIcon(type: ProfileType) {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 12px;
-  margin-bottom: 20px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  align-content: start;
+  padding-right: 4px;
 }
 
 .sub-card {
@@ -1660,6 +1744,7 @@ function typeIcon(type: ProfileType) {
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   margin-top: 16px;
+  flex-shrink: 0;
 }
 
 .sub-footer-card {
@@ -1670,6 +1755,11 @@ function typeIcon(type: ProfileType) {
   border-radius: 10px;
   border: 1px solid var(--border);
   background-color: var(--card-bg);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.sub-footer-card:hover {
+  border-color: var(--accent);
 }
 
 .footer-label {

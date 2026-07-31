@@ -1,13 +1,73 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { RefreshCw, Check, Globe, Shield, Route, ArrowUpDown, Eye, Filter, Link, RotateCcw } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import { useAppStore } from "@/stores/app";
 import { useI18n } from "vue-i18n";
+import yaml from "js-yaml";
 
 const app = useAppStore();
 const { show } = useToast();
 const { t } = useI18n();
+
+const STORAGE_KEY = "ns-vpn-subscriptions";
+const ACTIVE_KEY = "ns-vpn-active-sub";
+
+interface ProxyGroupInfo {
+  name: string;
+  type: string;
+  now?: string;
+  all: { name: string; type: string; delay?: number }[];
+}
+
+function loadProxyGroupsFromActiveSub(): ProxyGroupInfo[] {
+  try {
+    const activeId = localStorage.getItem(ACTIVE_KEY);
+    if (!activeId) return [];
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return [];
+    const subs = JSON.parse(saved);
+    const sub = subs.find((s: any) => s.id === activeId);
+    if (!sub) return [];
+    const content = sub.fileContent || sub.pasteContent || "";
+    if (!content) return [];
+    const doc = yaml.load(content) as any;
+    if (!doc) return [];
+    if (Array.isArray(doc["proxy-groups"])) {
+      return doc["proxy-groups"].map((g: any) => ({
+        name: g.name || "",
+        type: g.type || "Selector",
+        now: g.now || g.proxies?.[0] || "",
+        all: (g.proxies || []).map((p: string) => ({
+          name: p,
+          type: "",
+          delay: undefined,
+        })),
+      }));
+    }
+    if (Array.isArray(doc.proxies)) {
+      return [{
+        name: "Proxy",
+        type: "Selector",
+        now: doc.proxies[0]?.name || "",
+        all: doc.proxies.map((p: any) => ({
+          name: p.name || "",
+          type: p.type || "",
+          delay: undefined,
+        })),
+      }];
+    }
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+const proxyGroups = ref<ProxyGroupInfo[]>(loadProxyGroupsFromActiveSub());
+
+onMounted(() => {
+  proxyGroups.value = loadProxyGroupsFromActiveSub();
+});
 
 const selectedGroup = ref("");
 const testingAll = ref(false);
@@ -15,7 +75,7 @@ const showChain = ref(false);
 const sortBy = ref<"none" | "delay" | "name">("none");
 const sortAsc = ref(true);
 
-const groups = computed(() => app.proxyGroups);
+const groups = computed(() => proxyGroups.value);
 
 const currentGroup = computed(() => {
   return groups.value.find(g => g.name === selectedGroup.value) ?? groups.value[0];
