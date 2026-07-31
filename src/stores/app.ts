@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import i18n from "@/locales";
+import yaml from "js-yaml";
 import {
   getConfig, updateConfig, type AppConfig,
   getTraffic, type TrafficData,
@@ -8,12 +9,13 @@ import {
   getConnections, type ConnectionInfo,
   getRules, type RuleInfo,
   getLogs, type LogEntry,
-  startCore, stopCore, getCoreStatus,
+  startCore, stopCore, getCoreStatus, autoStartCore,
   setSystemProxy, setTunMode,
   selectProxy as tauriSelectProxy,
   testDelay as tauriTestDelay,
   closeConnection as tauriCloseConnection,
   closeAllConnections as tauriCloseAllConnections,
+  changeMode as tauriChangeMode,
 } from "@/utils/tauri";
 
 const STORAGE_KEY = "ns-vpn-settings";
@@ -38,6 +40,8 @@ export const useAppStore = defineStore("app", () => {
   const sidebarCollapsed = ref(false);
   const logFontSize = ref(local?.logFontSize ?? 14);
   const windowScale = ref(local?.windowScale ?? false);
+  const accentColor = ref(local?.accentColor ?? "#4f8ef7");
+const bgColor = ref(local?.bgColor ?? "default");
 
   // ---- Backend-synced settings (persisted to YAML via Rust) ----
   const mixedPort = ref(local?.mixedPort ?? 7890);
@@ -94,6 +98,82 @@ export const useAppStore = defineStore("app", () => {
   const coreVersion = ref("v1.18.0");
   const rulesCount = ref(0);
 
+  // ---- Subscription data (parsed from content on apply) ----
+  interface SubProxyGroup {
+    name: string;
+    type: string;
+    now?: string;
+    all: { name: string; type: string; delay?: number }[];
+  }
+  interface SubRule {
+    type: string;
+    payload: string;
+    proxy: string;
+    behavior: string;
+  }
+  const subProxyGroups = ref<SubProxyGroup[]>([]);
+  const subRules = ref<SubRule[]>([]);
+
+  function setSubData(content: string) {
+    try {
+      const doc = yaml.load(content) as any;
+      if (!doc) {
+        subProxyGroups.value = [];
+        subRules.value = [];
+        return;
+      }
+
+      const proxiesMap = new Map<string, string>();
+      if (Array.isArray(doc.proxies)) {
+        for (const p of doc.proxies) {
+          if (p.name) proxiesMap.set(p.name, p.type || "");
+        }
+      }
+
+      if (Array.isArray(doc["proxy-groups"])) {
+        subProxyGroups.value = doc["proxy-groups"].map((g: any) => ({
+          name: g.name || "",
+          type: g.type || "Selector",
+          now: g.now || g.proxies?.[0] || "",
+          all: (g.proxies || []).map((p: string) => ({
+            name: p,
+            type: proxiesMap.get(p) || "",
+            delay: undefined,
+          })),
+        }));
+      } else if (Array.isArray(doc.proxies)) {
+        subProxyGroups.value = [{
+          name: "Proxy",
+          type: "Selector",
+          now: doc.proxies[0]?.name || "",
+          all: doc.proxies.map((p: any) => ({
+            name: p.name || "",
+            type: p.type || "",
+            delay: undefined,
+          })),
+        }];
+      } else {
+        subProxyGroups.value = [];
+      }
+
+      if (Array.isArray(doc.rules)) {
+        subRules.value = doc.rules.map((r: string) => {
+          const parts = r.split(",").map((s: string) => s.trim());
+          const type = parts[0] || "";
+          const proxy = parts[parts.length - 1] || "";
+          const payload = parts.slice(1, -1).join(",") || "";
+          const behavior = type.startsWith("DOMAIN") ? "Domain" : type.startsWith("IP") || type === "GEOIP" ? "IPCIDR" : "Other";
+          return { type, payload, proxy, behavior };
+        });
+      } else {
+        subRules.value = [];
+      }
+    } catch {
+      subProxyGroups.value = [];
+      subRules.value = [];
+    }
+  }
+
   const isDark = computed(() => {
     if (theme.value === "auto") return window.matchMedia("(prefers-color-scheme: dark)").matches;
     return theme.value === "dark";
@@ -125,6 +205,7 @@ export const useAppStore = defineStore("app", () => {
       copyEnvType.value = cfg.copy_env_type;
       startupPage.value = cfg.startup_page;
       liteMode.value = cfg.lite_mode;
+      proxyRunning.value = cfg.proxy_running;
       dnsEnable.value = cfg.dns.enable;
       dnsListen.value = cfg.dns.listen;
       dnsEnhancedMode.value = cfg.dns.enhanced_mode;
@@ -163,6 +244,7 @@ export const useAppStore = defineStore("app", () => {
         startup_page: startupPage.value,
         lite_mode: liteMode.value,
         core_path: corePath.value,
+        proxy_running: proxyRunning.value,
       };
       await updateConfig(cfg);
     } catch { /* backend not available */ }
@@ -261,6 +343,11 @@ export const useAppStore = defineStore("app", () => {
   async function changeProxyMode(mode: string) {
     proxyMode.value = mode;
     await pushToBackend();
+    if (proxyRunning.value) {
+      try {
+        await tauriChangeMode(mode);
+      } catch {}
+    }
   }
 
   async function startCoreCmd() {
@@ -299,10 +386,11 @@ export const useAppStore = defineStore("app", () => {
   }
 
   // Persist local settings
-  watch([theme, language, sidebarCollapsed, logFontSize, windowScale], () => {
+  watch([theme, language, sidebarCollapsed, logFontSize, windowScale, accentColor, bgColor], () => {
     saveLocalSettings({
       theme: theme.value, language: language.value,
       logFontSize: logFontSize.value, windowScale: windowScale.value,
+      accentColor: accentColor.value, bgColor: bgColor.value,
     });
   }, { deep: true });
 
@@ -311,7 +399,7 @@ export const useAppStore = defineStore("app", () => {
 
   return {
     // Local
-    theme, language, sidebarCollapsed, logFontSize, windowScale, isDark,
+    theme, language, sidebarCollapsed, logFontSize, windowScale, accentColor, bgColor, isDark,
     // Backend-synced
     mixedPort, apiPort, allowLan, bindAddress, proxyMode, logLevel, ipv6,
     systemProxy, tunMode, corePath, startAtBoot, silentStart, unifiedDelay,
@@ -325,6 +413,8 @@ export const useAppStore = defineStore("app", () => {
     proxyRunning, traffic, proxyGroups, connections, rules, logs,
     coreVersion, rulesCount, connectionUploadTotal, connectionDownloadTotal,
     currentProxyGroup, currentNode,
+    // Subscription data
+    subProxyGroups, subRules, setSubData,
     // Actions
     setTheme, setProxyRunning, toggleSidebar, setSystemProxyMode,
     setTunModeEnabled, changeProxyMode, startCoreCmd, stopCoreCmd,

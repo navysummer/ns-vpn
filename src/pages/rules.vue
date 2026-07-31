@@ -1,56 +1,15 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { Search, RefreshCw } from "lucide-vue-next";
+import { Search } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import BasePage from "@/components/BasePage.vue";
 import EmptyState from "@/components/EmptyState.vue";
-import yaml from "js-yaml";
 
 const app = useAppStore();
 const { t } = useI18n();
 
-interface RuleEntry {
-  type: string;
-  payload: string;
-  proxy: string;
-  behavior: string;
-}
-
-const STORAGE_KEY = "ns-vpn-subscriptions";
-const ACTIVE_KEY = "ns-vpn-active-sub";
-
-function loadRulesFromActiveSub(): RuleEntry[] {
-  try {
-    const activeId = localStorage.getItem(ACTIVE_KEY);
-    if (!activeId) return [];
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return [];
-    const subs = JSON.parse(saved);
-    const sub = subs.find((s: any) => s.id === activeId);
-    if (!sub) return [];
-    const content = sub.fileContent || sub.pasteContent || "";
-    if (!content) return [];
-    const doc = yaml.load(content) as any;
-    if (!doc || !Array.isArray(doc.rules)) return [];
-    return doc.rules.map((r: string) => {
-      const parts = r.split(",").map((s: string) => s.trim());
-      const type = parts[0] || "";
-      const proxy = parts[parts.length - 1] || "";
-      const payload = parts.slice(1, -1).join(",") || "";
-      const behavior = type.startsWith("DOMAIN") ? "Domain" : type.startsWith("IP") || type === "GEOIP" ? "IPCIDR" : "Other";
-      return { type, payload, proxy, behavior };
-    });
-  } catch {
-    return [];
-  }
-}
-
-const rules = ref<RuleEntry[]>(loadRulesFromActiveSub());
-
-onMounted(() => {
-  rules.value = loadRulesFromActiveSub();
-});
+const rules = computed(() => app.subRules);
 
 const searchQuery = ref("");
 const filterType = ref<"all" | "DOMAIN" | "IP-CIDR" | "GEOIP" | "MATCH">("all");

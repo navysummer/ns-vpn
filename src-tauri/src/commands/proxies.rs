@@ -32,17 +32,22 @@ pub async fn get_proxies(state: State<'_, AppState>) -> Result<Vec<ProxyGroupInf
                         || group_type == "Relay"
                     {
                         let now = val.get("now").and_then(|v| v.as_str()).map(|s| s.to_string());
-                        let all_nodes = val.get("all").and_then(|v| v.as_array());
+                        let all_names = val.get("all").and_then(|v| v.as_array());
                         let mut nodes = Vec::new();
-                        if let Some(arr) = all_nodes {
-                            for node in arr {
-                                let node_name = node.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                let node_type = node.get("type").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                let delay = node.get("delay").and_then(|v| v.as_u64()).map(|d| d as u32);
+                        if let Some(arr) = all_names {
+                            for node_val in arr {
+                                // meow returns plain name strings in `all`
+                                let node_name = node_val.as_str().unwrap_or("").to_string();
+                                if node_name.is_empty() { continue; }
+                                let node_type = obj.get(&node_name)
+                                    .and_then(|v| v.get("type"))
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
                                 nodes.push(ProxyNodeInfo {
                                     name: node_name,
                                     node_type,
-                                    delay,
+                                    delay: None,
                                 });
                             }
                         }
@@ -78,4 +83,14 @@ pub async fn test_delay(state: State<'_, AppState>, name: String, url: Option<St
         return Ok(result.delay);
     }
     Ok(0)
+}
+
+#[tauri::command]
+pub async fn change_mode(state: State<'_, AppState>, mode: String) -> Result<(), String> {
+    if let Some(client) = state.core_manager.client() {
+        let patch = serde_json::json!({ "mode": mode });
+        client.patch_configs(patch).await?;
+        return Ok(());
+    }
+    Err("Core not running".into())
 }

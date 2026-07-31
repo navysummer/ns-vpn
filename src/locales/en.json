@@ -48,7 +48,11 @@
     "ruleModeHint": "Route traffic based on rules, recommended for most users",
     "globalModeHint": "All traffic goes through proxy server, for global proxy needs",
     "directModeHint": "All traffic goes directly, no proxy used",
-    "switchedToMode": "Switched to {mode} mode"
+    "switchedToMode": "Switched to {mode} mode",
+    "startCore": "Start",
+    "stopCore": "Stop",
+    "coreStarted": "Core started",
+    "coreStopped": "Core stopped"
   },
   "home": {
     "subscription": {
@@ -140,14 +144,24 @@
     }
   },
   "proxies": {
-    "title": "Proxy Groups",
+    "title": "Proxies",
     "chainProxy": "Chain Proxy",
-    "testAll": "Speed Test",
+    "testAll": "Test All",
+    "testDelay": "Test Delay",
     "testing": "Testing...",
     "sortByDelay": "Sort by Delay",
     "filter": "Filter",
     "showHidden": "Show Hidden",
-    "deselect": "Deselect"
+    "deselect": "Deselect",
+    "groups": "groups",
+    "offline": "Offline",
+    "noGroups": "No proxy groups",
+    "noGroupsDesc": "Proxy info will load after core starts",
+    "coreNotRunning": "Core not running, please start the core first",
+    "directModeTitle": "Direct Mode",
+    "directModeDesc": "All traffic goes directly, no proxy node selection needed",
+    "expandAll": "Expand All",
+    "collapseAll": "Collapse All"
   },
   "subscriptions": {
     "title": "Subscriptions",

@@ -3,6 +3,74 @@ use tauri::State;
 use crate::AppState;
 
 #[tauri::command]
+pub async fn write_config_only(
+    state: State<'_, AppState>,
+    content: String,
+) -> Result<(), String> {
+    let config_dir = dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("ns-vpn");
+
+    if !config_dir.exists() {
+        std::fs::create_dir_all(&config_dir).map_err(|e| e.to_string())?;
+    }
+
+    let config_file = config_dir.join("config.yaml");
+    let config = state.config.read().clone();
+
+    let sub_yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content)
+        .unwrap_or(serde_yaml_ng::Value::Null);
+
+    let proxies = sub_yaml.get("proxies").cloned().unwrap_or(serde_yaml_ng::Value::Null);
+    let proxy_groups = sub_yaml.get("proxy-groups").cloned().unwrap_or(serde_yaml_ng::Value::Null);
+    let rules = sub_yaml.get("rules").cloned().unwrap_or(serde_yaml_ng::Value::Null);
+
+    let dns_fallback_filter = if config.dns.fallback_filter {
+        serde_json::json!({
+            "geoip": true,
+            "geoip-code": "CN",
+            "ipcidr": ["240.0.0.0/4"],
+        })
+    } else {
+        serde_json::json!({ "geoip": false })
+    };
+
+    let meow_config = serde_json::json!({
+        "mixed-port": config.mixed_port,
+        "allow-lan": config.allow_lan,
+        "bind-address": config.bind_address,
+        "mode": config.mode,
+        "log-level": config.log_level,
+        "ipv6": config.ipv6,
+        "external-controller": config.external_controller,
+        "tun": {
+            "enable": config.tun_mode,
+            "stack": config.tun.stack,
+            "dns-hijack": config.tun.dns_hijack,
+            "auto-route": config.tun.auto_route,
+            "strict-route": config.tun.strict_route,
+        },
+        "dns": {
+            "enable": config.dns.enable,
+            "listen": config.dns.listen,
+            "enhanced-mode": config.dns.enhanced_mode,
+            "fake-ip-range": config.dns.fake_ip_range,
+            "nameserver": config.dns.nameserver,
+            "fallback": config.dns.fallback,
+            "fallback-filter": dns_fallback_filter,
+        },
+        "proxies": proxies,
+        "proxy-groups": proxy_groups,
+        "rules": rules,
+    });
+
+    let yaml = serde_yaml_ng::to_string(&meow_config).map_err(|e| e.to_string())?;
+    std::fs::write(&config_file, yaml).map_err(|e| e.to_string())?;
+    state.core_manager.set_skip_write(true);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn apply_subscription(
     state: State<'_, AppState>,
     content: String,

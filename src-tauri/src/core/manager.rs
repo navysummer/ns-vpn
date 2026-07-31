@@ -48,6 +48,8 @@ impl CoreManager {
         }
         *self.skip_write.write() = false;
 
+        ensure_geodata().await?;
+
         let api_port = config.api_port;
         let config_path_str = config_path.to_string_lossy().to_string();
 
@@ -55,27 +57,32 @@ impl CoreManager {
 
         let api_port_clone = api_port;
         let running_flag = Arc::new(RwLock::new(false));
-        let client_ref = Arc::new(RwLock::new(None::<Arc<MihomoClient>>));
+
+        let client = Arc::new(MihomoClient::new(api_port));
 
         let running_for_task = Arc::clone(&running_flag);
-        let client_for_task = Arc::clone(&client_ref);
 
         tokio::spawn(async move {
-            if let Err(e) = run_meow_kernel(
+            log::info!("Starting meow kernel with config: {}", config_path_str);
+            match run_meow_kernel(
                 &config_path_str,
                 api_port_clone,
                 &mut shutdown_rx,
                 &running_for_task,
-                &client_for_task,
             ).await {
-                log::error!("meow kernel error: {}", e);
-                *running_for_task.write() = false;
+                Ok(()) => {
+                    log::info!("meow kernel exited normally");
+                }
+                Err(e) => {
+                    log::error!("meow kernel error: {}", e);
+                    *running_for_task.write() = false;
+                }
             }
         });
 
         *self.api_port.write() = api_port;
         *self.running.write() = true;
-        *self.client.write() = client_ref.read().clone();
+        *self.client.write() = Some(client);
         *self.shutdown_tx.write() = Some(shutdown_tx);
 
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -104,6 +111,20 @@ impl CoreManager {
     }
 
     async fn write_config(&self, config: &AppConfig, config_path: &std::path::Path) -> Result<(), String> {
+        let existing = if config_path.exists() {
+            std::fs::read_to_string(config_path).ok()
+                .and_then(|c| serde_yaml_ng::from_str::<serde_yaml_ng::Value>(&c).ok())
+        } else {
+            None
+        };
+
+        let proxies = existing.as_ref().and_then(|e| e.get("proxies")).cloned()
+            .unwrap_or(serde_yaml_ng::Value::Null);
+        let proxy_groups = existing.as_ref().and_then(|e| e.get("proxy-groups")).cloned()
+            .unwrap_or(serde_yaml_ng::Value::Null);
+        let rules = existing.as_ref().and_then(|e| e.get("rules")).cloned()
+            .unwrap_or(serde_yaml_ng::Value::Null);
+
         let dns_fallback_filter = if config.dns.fallback_filter {
             serde_json::json!({
                 "geoip": true,
@@ -140,6 +161,9 @@ impl CoreManager {
                 "fallback": config.dns.fallback,
                 "fallback-filter": dns_fallback_filter,
             },
+            "proxies": proxies,
+            "proxy-groups": proxy_groups,
+            "rules": rules,
         });
 
         let yaml = serde_yaml_ng::to_string(&meow_config).map_err(|e| e.to_string())?;
@@ -150,19 +174,46 @@ impl CoreManager {
     }
 }
 
+async fn ensure_geodata() -> Result<(), String> {
+    let mmdb_path = meow_config::default_geoip_path();
+    let asn_path = meow_config::default_asn_path();
+    let geosite_path = meow_config::default_geosite_path();
+
+    let targets: Vec<(&str, &std::path::Path)> = vec![
+        ("Country.mmdb", mmdb_path.as_path()),
+        ("GeoLite2-ASN.mmdb", asn_path.as_path()),
+        ("geosite.dat", geosite_path.as_path()),
+    ];
+
+    for (label, path) in targets {
+        if path.exists() {
+            continue;
+        }
+        let url = match label {
+            "Country.mmdb" => "https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/country.mmdb",
+            "GeoLite2-ASN.mmdb" => "https://github.com/P3TERX/GeoLite.mmdb/releases/latest/download/GeoLite2-ASN.mmdb",
+            _ => "https://github.com/MetaCubeX/meta-rules-dat/releases/latest/download/geosite.dat",
+        };
+        log::info!("geodata: downloading {} to {}", label, path.display());
+        meow_config::geodata::download_and_replace(url, path, None)
+            .await
+            .map_err(|e| format!("failed to download geodata {label}: {e}"))?;
+    }
+
+    Ok(())
+}
+
 async fn run_meow_kernel(
     config_path: &str,
     api_port: u16,
     shutdown_rx: &mut tokio::sync::watch::Receiver<bool>,
     running_flag: &Arc<RwLock<bool>>,
-    client_ref: &Arc<RwLock<Option<Arc<MihomoClient>>>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use meow_config::load_config;
     use meow_config::ListenerType;
     use meow_tunnel::tunnel::Tunnel;
     use meow_listener::SnifferRuntime;
     use meow_api::ApiServer;
-    use meow_api::log_stream;
     use dashmap::DashMap;
     use parking_lot::RwLock as PLRwLock;
     use std::net::IpAddr;
@@ -224,7 +275,7 @@ async fn run_meow_kernel(
     }
 
     let api_addr: std::net::SocketAddr = format!("0.0.0.0:{}", api_port).parse()?;
-    let (log_tx, _log_rx) = tokio::sync::broadcast::channel::<log_stream::LogMessage>(1024);
+    let log_tx = crate::get_log_tx();
 
     let api_server = ApiServer::new(
         tunnel.clone(),
@@ -239,8 +290,6 @@ async fn run_meow_kernel(
         config.api.external_ui.clone(),
     );
 
-    let client = MihomoClient::new(api_port);
-    *client_ref.write() = Some(Arc::new(client));
     *running_flag.write() = true;
 
     tokio::select! {
@@ -255,6 +304,5 @@ async fn run_meow_kernel(
     }
 
     *running_flag.write() = false;
-    *client_ref.write() = None;
     Ok(())
 }

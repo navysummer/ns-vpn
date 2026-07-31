@@ -158,6 +158,10 @@ async function doSetDefault(ver: string) {
   }
 }
 
+const accentColors = ["#4f8ef7", "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316", "#22c55e", "#06b6d4", "#3b82f6"];
+const bgThemeNames: Record<string, string> = { default: "默认深色", navy: "深邃海军", midnight: "午夜蓝", forest: "森林绿", warm: "暖棕", dracula: "紫罗兰" };
+const bgThemeColors: Record<string, string> = { default: "#0f0f11", navy: "#0d1117", midnight: "#0a0a1a", forest: "#0a140a", warm: "#14100c", dracula: "#1e1e2e" };
+
 const panelTitle = computed(() => {
   const key = activePanel.value;
   if (!key) return "";
@@ -618,14 +622,18 @@ const panelTitle = computed(() => {
               <div class="modal-field">
                 <label class="modal-label">{{ t('settings.accentColor') }}</label>
                 <div class="color-grid">
-                  <button class="color-swatch active" style="background:#6366f1"></button>
-                  <button class="color-swatch" style="background:#8b5cf6"></button>
-                  <button class="color-swatch" style="background:#ec4899"></button>
-                  <button class="color-swatch" style="background:#f43f5e"></button>
-                  <button class="color-swatch" style="background:#f97316"></button>
-                  <button class="color-swatch" style="background:#22c55e"></button>
-                  <button class="color-swatch" style="background:#06b6d4"></button>
-                  <button class="color-swatch" style="background:#3b82f6"></button>
+                  <button v-for="c in accentColors" :key="c" class="color-swatch" :class="{ active: app.accentColor === c }" :style="{ background: c }" @click="app.accentColor = c">
+                    <svg v-if="app.accentColor === c" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="modal-field">
+                <label class="modal-label">{{ t('settings.bgTheme') }}</label>
+                <div class="bg-grid">
+                  <button v-for="(label, key) in bgThemeNames" :key="key" class="bg-option" :class="{ active: app.bgColor === key }" @click="app.bgColor = key">
+                    <div class="bg-preview" :style="{ background: bgThemeColors[key], border: '1px solid var(--border)' }"></div>
+                    <span class="bg-name">{{ label }}</span>
+                  </button>
                 </div>
               </div>
             </template>
@@ -1094,12 +1102,15 @@ const panelTitle = computed(() => {
 }
 
 .color-swatch {
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 2px solid transparent;
   cursor: pointer;
   transition: all 150ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .color-swatch:hover {
   transform: scale(1.15);
@@ -1107,6 +1118,44 @@ const panelTitle = computed(() => {
 .color-swatch.active {
   border-color: var(--text-primary);
   box-shadow: 0 0 0 2px var(--card-bg);
+}
+
+.bg-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.bg-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.bg-option:hover {
+  border-color: var(--accent);
+}
+.bg-option.active {
+  border-color: var(--accent);
+  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.bg-preview {
+  width: 100%;
+  height: 40px;
+  border-radius: 6px;
+}
+
+.bg-name {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-weight: 500;
 }
 
 /* Version Management */

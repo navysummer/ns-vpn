@@ -7,7 +7,7 @@ import { useAppStore } from "@/stores/app";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
 import QrViewer from "@/components/QrViewer.vue";
-import { applySubscription, fetchSubscriptionUrl, openAppDir, convertContent } from "@/utils/tauri";
+import { writeConfigOnly, fetchSubscriptionUrl, openAppDir, convertContent } from "@/utils/tauri";
 
 const { show } = useToast();
 const { t } = useI18n();
@@ -310,10 +310,15 @@ async function applySub(sub: Subscription) {
       show(t("subscriptions.enterSubUrl"), "error");
       return;
     }
+    let finalContent = content;
     if (app.overrideMergeContent && app.overrideMergeContent !== "# override config") {
-      content = content + "\n" + app.overrideMergeContent;
+      finalContent = content + "\n" + app.overrideMergeContent;
     }
-    await applySubscription(content, "clash");
+    await writeConfigOnly(finalContent);
+    app.setSubData(finalContent);
+    if (!app.proxyRunning) {
+      try { await app.startCoreCmd(); } catch {}
+    }
     sub.lastUpdate = new Date().toISOString().split("T")[0];
     sub.timeAgo = t("subscriptions.justNow");
     show(t("subscriptions.switchedTo", { name: sub.name }), "success");

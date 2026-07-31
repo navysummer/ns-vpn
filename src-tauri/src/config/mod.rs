@@ -58,6 +58,8 @@ pub struct AppConfig {
     pub lite_mode: bool,
     #[serde(default = "default_core_path")]
     pub core_path: String,
+    #[serde(default)]
+    pub proxy_running: bool,
 }
 
 fn default_mixed_port() -> u16 { 7890 }
@@ -106,6 +108,7 @@ impl Default for AppConfig {
             startup_page: default_startup_page(),
             lite_mode: false,
             core_path: default_core_path(),
+            proxy_running: false,
         }
     }
 }

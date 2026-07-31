@@ -41,6 +41,7 @@ export interface AppConfig {
   startup_page: string;
   lite_mode: boolean;
   core_path: string;
+  proxy_running: boolean;
 }
 
 export const getConfig = () => tauriInvoke<AppConfig>("get_config");
@@ -58,6 +59,7 @@ export const startCore = () => tauriInvoke("start_core");
 export const stopCore = () => tauriInvoke("stop_core");
 export const restartCore = () => tauriInvoke("restart_core");
 export const getCoreStatus = () => tauriInvoke<CoreStatus>("get_core_status");
+export const autoStartCore = () => tauriInvoke<boolean>("auto_start_core");
 
 // ---- Core Download ----
 export interface CoreInfo {
@@ -152,6 +154,8 @@ export const selectProxy = (group: string, name: string) =>
   tauriInvoke("select_proxy", { group, name });
 export const testDelay = (name: string, url?: string) =>
   tauriInvoke<number>("test_delay", { name, url });
+export const changeMode = (mode: string) =>
+  tauriInvoke("change_mode", { mode });
 
 // ---- Connections ----
 export interface ConnectionMeta {
@@ -204,3 +208,5 @@ export const fetchSubscriptionUrl = (url: string) =>
   tauriInvoke<string>("fetch_subscription_url", { url });
 export const convertContent = (content: string, format: string) =>
   tauriInvoke<string>("convert_content", { content, format });
+export const writeConfigOnly = (content: string) =>
+  tauriInvoke("write_config_only", { content });

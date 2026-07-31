@@ -36,19 +36,35 @@ pub struct ConnectionsResponse {
     pub download_total: u64,
 }
 
+fn fmt_addr(ip: &Option<String>, port: u16) -> String {
+    match ip {
+        Some(ip) if !ip.is_empty() => format!("{}:{}", ip, port),
+        _ => if port > 0 { format!(":{}", port) } else { String::new() },
+    }
+}
+
 #[tauri::command]
 pub async fn get_connections(state: State<'_, AppState>) -> Result<ConnectionsResponse, String> {
     if let Some(client) = state.core_manager.client() {
         let resp = client.get_connections().await?;
-        return Ok(ConnectionsResponse {
-            connections: resp.connections.into_iter().map(|c| ConnectionInfo {
-                id: c.id,
+        let conns = resp.connections.into_iter().map(|c| {
+            let source = fmt_addr(&c.metadata.src_ip, c.metadata.src_port);
+            let destination = if !c.metadata.host.is_empty() {
+                if c.metadata.dst_port > 0 {
+                    format!("{}:{}", c.metadata.host, c.metadata.dst_port)
+                } else {
+                    c.metadata.host.clone()
+                }
+            } else {
+                fmt_addr(&c.metadata.dst_ip, c.metadata.dst_port)
+            };
+            ConnectionInfo {
                 metadata: ConnectionMeta {
-                    network: c.metadata.network,
-                    meta_type: c.metadata.meta_type,
-                    source: c.metadata.source,
-                    destination: c.metadata.destination,
-                    host: c.metadata.host,
+                    network: c.metadata.network.clone(),
+                    meta_type: c.metadata.meta_type.clone(),
+                    source: source.clone(),
+                    destination: destination.clone(),
+                    host: c.metadata.host.clone(),
                 },
                 upload: c.upload,
                 download: c.download,
@@ -56,11 +72,15 @@ pub async fn get_connections(state: State<'_, AppState>) -> Result<ConnectionsRe
                 chains: c.chains,
                 rule: c.rule,
                 rule_payload: c.rule_payload,
-                source: c.source,
-                destination: c.destination,
-                conn_type: c.conn_type,
-                network: c.network,
-            }).collect(),
+                source,
+                destination,
+                conn_type: c.metadata.meta_type,
+                network: c.metadata.network,
+                id: c.id,
+            }
+        }).collect();
+        return Ok(ConnectionsResponse {
+            connections: conns,
             upload_total: resp.upload_total,
             download_total: resp.download_total,
         });

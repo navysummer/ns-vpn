@@ -48,7 +48,11 @@
     "ruleModeHint": "根据规则进行分流，推荐大部分用户使用",
     "globalModeHint": "所有流量均通过代理服务器，适用于需要全局科学上网的场景",
     "directModeHint": "所有流量直连，不使用代理服务器",
-    "switchedToMode": "已切换到{mode}模式"
+    "switchedToMode": "已切换到{mode}模式",
+    "startCore": "启动",
+    "stopCore": "停止",
+    "coreStarted": "核心已启动",
+    "coreStopped": "核心已停止"
   },
   "home": {
     "subscription": {
@@ -140,14 +144,24 @@
     }
   },
   "proxies": {
-    "title": "代理组",
+    "title": "代理",
     "chainProxy": "链式代理",
-    "testAll": "延迟测试",
+    "testAll": "测试全部",
+    "testDelay": "测试延迟",
     "testing": "测试中...",
     "sortByDelay": "按延迟排序",
     "filter": "筛选",
     "showHidden": "显示隐藏",
-    "deselect": "取消选择"
+    "deselect": "取消选择",
+    "groups": "个代理组",
+    "offline": "未连接",
+    "noGroups": "暂无代理组",
+    "noGroupsDesc": "核心运行后将自动加载代理信息",
+    "coreNotRunning": "核心未运行，请先启动核心",
+    "directModeTitle": "直连模式",
+    "directModeDesc": "所有流量直接连接，无需选择代理节点",
+    "expandAll": "全部展开",
+    "collapseAll": "全部折叠"
   },
   "subscriptions": {
     "title": "订阅",

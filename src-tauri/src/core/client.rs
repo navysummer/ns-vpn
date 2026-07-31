@@ -14,6 +14,10 @@ impl MihomoClient {
         }
     }
 
+    fn urlencode(s: &str) -> String {
+        urlencoding::encode(s).into_owned()
+    }
+
     pub async fn get_configs(&self) -> Result<serde_json::Value, String> {
         self.get("/configs").await
     }
@@ -27,13 +31,14 @@ impl MihomoClient {
     }
 
     pub async fn get_proxy_delay(&self, name: &str, url: &str, timeout: u64) -> Result<DelayResult, String> {
-        let path = format!("/delay?name={}&url={}&timeout={}", name, url, timeout);
+        let encoded = Self::urlencode(name);
+        let path = format!("/proxies/{}/delay?url={}&timeout={}", encoded, url, timeout);
         self.get(&path).await
     }
 
     pub async fn select_proxy(&self, group: &str, name: &str) -> Result<(), String> {
         let body = serde_json::json!({ "name": name });
-        self.put(&format!("/proxies/{}", group), body).await
+        self.put(&format!("/proxies/{}", Self::urlencode(group)), body).await
     }
 
     pub async fn get_connections(&self) -> Result<ConnectionsResponse, String> {
@@ -53,7 +58,35 @@ impl MihomoClient {
     }
 
     pub async fn get_traffic(&self) -> Result<Vec<TrafficEntry>, String> {
-        self.get("/traffic").await
+        let url = format!("{}/traffic", self.base_url);
+        let resp = self.client.get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!("Traffic API error: HTTP {}", resp.status()));
+        }
+        // /traffic is an SSE-style stream (one JSON line per second).
+        // Read a single line so the request does not hang forever.
+        let mut lines = resp.bytes_stream();
+        use futures_util::StreamExt;
+        let mut buf: Vec<u8> = Vec::new();
+        let mut entries = Vec::new();
+        'read_line: while let Some(chunk) = lines.next().await {
+            let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
+            buf.extend_from_slice(&chunk);
+            if let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+                let line = &buf[..pos];
+                if let Ok(entry) = serde_json::from_slice::<TrafficEntry>(line) {
+                    entries.push(entry);
+                    break 'read_line;
+                }
+            }
+            if buf.len() > 4096 {
+                break;
+            }
+        }
+        Ok(entries)
     }
 
     pub async fn get_logs(&self) -> Result<Vec<LogEntry>, String> {
@@ -66,16 +99,24 @@ impl MihomoClient {
             .send()
             .await
             .map_err(|e| format!("Request failed: {}", e))?;
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("API error: {}", text));
+        }
         resp.json().await.map_err(|e| format!("Parse failed: {}", e))
     }
 
     async fn patch(&self, path: &str, body: serde_json::Value) -> Result<(), String> {
         let url = format!("{}{}", self.base_url, path);
-        self.client.patch(&url)
+        let resp = self.client.patch(&url)
             .json(&body)
             .send()
             .await
             .map_err(|e| format!("Request failed: {}", e))?;
+        if !resp.status().is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("API error: {}", text));
+        }
         Ok(())
     }
 
@@ -112,41 +153,61 @@ pub struct DelayResult {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ConnectionsResponse {
+    #[serde(rename = "uploadTotal", default)]
+    pub upload_total: u64,
+    #[serde(rename = "downloadTotal", default)]
+    pub download_total: u64,
+    #[serde(default)]
+    pub memory: u64,
     #[serde(default)]
     pub connections: Vec<ConnectionInfo>,
-    #[serde(default)]
-    pub upload_total: u64,
-    #[serde(default)]
-    pub download_total: u64,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ConnectionInfo {
     pub id: String,
+    #[serde(default)]
     pub metadata: ConnectionMeta,
+    #[serde(default)]
     pub upload: u64,
+    #[serde(default)]
     pub download: u64,
+    #[serde(default)]
     pub start: String,
+    #[serde(default)]
     pub chains: Vec<String>,
+    #[serde(default)]
     pub rule: String,
+    #[serde(rename = "rulePayload", default)]
     pub rule_payload: String,
-    pub source: String,
-    pub destination: String,
-    #[serde(rename = "type")]
-    pub conn_type: String,
-    pub network: String,
-    pub host: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 pub struct ConnectionMeta {
+    #[serde(default)]
     pub network: String,
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default)]
     pub meta_type: String,
-    pub source: String,
-    pub destination: String,
+    #[serde(rename = "sourceIP", default)]
+    pub src_ip: Option<String>,
+    #[serde(rename = "destinationIP", default)]
+    pub dst_ip: Option<String>,
+    #[serde(rename = "sourcePort", default)]
+    pub src_port: u16,
+    #[serde(rename = "destinationPort", default)]
+    pub dst_port: u16,
+    #[serde(default)]
     pub host: String,
+    #[serde(rename = "dnsMode", default)]
     pub dns_mode: String,
+    #[serde(default)]
+    pub process: String,
+    #[serde(rename = "processPath", default)]
+    pub process_path: String,
+    #[serde(rename = "inboundName", default)]
+    pub in_name: String,
+    #[serde(rename = "inboundPort", default)]
+    pub in_port: u16,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -157,10 +218,13 @@ pub struct RulesResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RuleInfo {
-    #[serde(rename = "type")]
+    #[serde(rename = "type", default)]
     pub rule_type: String,
+    #[serde(default)]
     pub payload: String,
+    #[serde(default)]
     pub proxy: String,
+    #[serde(default)]
     pub matcher: String,
 }
 
