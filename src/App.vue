@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, onMounted, onUnmounted } from "vue";
+import { watch, onMounted } from "vue";
 import { useAppStore } from "@/stores/app";
 import Sidebar from "@/components/Sidebar.vue";
 import ToastContainer from "@/components/ToastContainer.vue";
@@ -76,7 +76,6 @@ watch(
 
 onMounted(async () => {
   app.syncFromBackend();
-  app.startPolling();
 
   // Sync autostart state from OS
   try {
@@ -111,15 +110,20 @@ onMounted(async () => {
           app.activeSubUrl = sub.url || "";
           app.activeSubUpdateTime = sub.lastUpdate || "";
           let content = sub.fileContent || sub.pasteContent || "";
+          let needConvert = sub.format !== "clash" && !sub.fileContent;
           if (!content && sub.type === "remote" && sub.url) {
             content = await fetchSubscriptionUrl(sub.url);
-            if (sub.format !== "clash") {
+            needConvert = true;
+          }
+          if (needConvert && content) {
+            try {
               content = await convertContent(content, sub.format);
+            } catch {
+              content = "";
             }
           }
           if (content) {
             await writeConfigOnly(content);
-            app.setSubData(content);
           }
         }
       }
@@ -133,14 +137,14 @@ onMounted(async () => {
     const started = await autoStartCore();
     if (started) {
       app.proxyRunning = true;
+      await app.waitForCore();
+      await app.fetchProxies();
+      await app.fetchRules();
+      await app.fetchConnections();
     }
   } catch {
     // auto-start failed, ignore
   }
-});
-
-onUnmounted(() => {
-  app.stopPolling();
 });
 </script>
 

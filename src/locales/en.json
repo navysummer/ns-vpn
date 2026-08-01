@@ -210,7 +210,6 @@
     "formatClash": "Clash (YAML)",
     "formatV2rayN": "v2rayN (Base64)",
     "formatSingbox": "Sing-box (JSON)",
-    "formatOpenvpn": "OpenVPN",
     "pasteContent": "Paste Config Content",
     "pastePlaceholder": "Paste config content here...",
     "importFile": "Import File",

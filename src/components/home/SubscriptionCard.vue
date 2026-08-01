@@ -13,8 +13,7 @@ const router = useRouter();
 const { t } = useI18n();
 
 const groups = computed(() => {
-  const gs = app.proxyRunning ? app.proxyGroups : app.subProxyGroups;
-  return gs.filter(g => g.name !== "GLOBAL");
+  return app.proxyGroups.filter(g => g.name !== "GLOBAL");
 });
 const groupCount = computed(() => groups.value.length);
 const proxyCount = computed(() => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { Search } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
@@ -9,7 +9,20 @@ import EmptyState from "@/components/EmptyState.vue";
 const app = useAppStore();
 const { t } = useI18n();
 
-const rules = computed(() => app.subRules);
+onMounted(() => {
+  if (app.proxyRunning) {
+    app.fetchRules();
+  }
+});
+
+const rules = computed(() => {
+  return app.rules.map(r => ({
+    type: r.type,
+    payload: r.payload,
+    proxy: r.proxy,
+    behavior: r.type.startsWith("DOMAIN") ? "Domain" : r.type.startsWith("IP") ? "IPCIDR" : r.type,
+  }));
+});
 
 const searchQuery = ref("");
 const filterType = ref<"all" | "DOMAIN" | "IP-CIDR" | "GEOIP" | "MATCH">("all");
@@ -114,8 +127,8 @@ function typeBg(type: string): string {
 <style scoped>
 .rules-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: calc(100vh - 300px);
 }
 
 .providers-panel {

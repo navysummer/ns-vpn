@@ -16,7 +16,7 @@ const ACTIVE_KEY = "ns-vpn-active-sub";
 const activeSubId = ref(localStorage.getItem(ACTIVE_KEY));
 const selectedSub = ref<string | null>(activeSubId.value);
 
-type ConfigFormat = "clash" | "v2rayn" | "singbox" | "openvpn";
+type ConfigFormat = "clash" | "v2rayn" | "singbox";
 type ProfileType = "remote" | "local" | "script";
 
 interface Subscription {
@@ -62,7 +62,6 @@ const formatOptions = [
   { label: t("subscriptions.formatClash"), value: "clash" },
   { label: t("subscriptions.formatV2rayN"), value: "v2rayn" },
   { label: t("subscriptions.formatSingbox"), value: "singbox" },
-  { label: t("subscriptions.formatOpenvpn"), value: "openvpn" },
 ];
 
 const filterLabel = computed(() => {
@@ -226,8 +225,9 @@ let rawContent: string | undefined;
     } else {
       try {
         fileContent = await convertContent(rawContent, newFormat.value);
-      } catch {
-        fileContent = rawContent;
+      } catch (e: any) {
+        show(`${e}`, "error");
+        return;
       }
     }
   } else if (newType.value === "script" && newPasteContent.value) {
@@ -237,8 +237,9 @@ let rawContent: string | undefined;
     } else {
       try {
         fileContent = await convertContent(rawContent, newFormat.value);
-      } catch {
-        fileContent = rawContent;
+      } catch (e: any) {
+        show(`${e}`, "error");
+        return;
       }
     }
   }
@@ -268,17 +269,29 @@ let rawContent: string | undefined;
   showCreateDialog.value = false;
 }
 
-function refreshSubscription(id: string) {
+async function refreshSubscription(id: string) {
+  const sub = subscriptions.value.find(s => s.id === id);
+  if (!sub) return;
   updating.value = id;
-  setTimeout(() => {
-    const sub = subscriptions.value.find(s => s.id === id);
-    if (sub) {
-      sub.lastUpdate = new Date().toISOString().split("T")[0];
-      sub.timeAgo = t("subscriptions.justNow");
+  try {
+    if (sub.type === "remote" && sub.url) {
+      let content = await fetchSubscriptionUrl(sub.url);
+      if (sub.format !== "clash") {
+        content = await convertContent(content, sub.format);
+      }
+      sub.fileContent = content;
     }
+    sub.lastUpdate = new Date().toISOString().split("T")[0];
+    sub.timeAgo = t("subscriptions.justNow");
+    show(`${t('subscriptions.refresh')}: ${sub.name}`, "success");
+    if (sub.id === activeSubId.value) {
+      await applySub(sub, true);
+    }
+  } catch (e: any) {
+    show(`${sub.name}: ${e}`, "error");
+  } finally {
     updating.value = null;
-    show(`${t('subscriptions.refresh')}: ${sub?.name || id}`, "success");
-  }, 1500);
+  }
 }
 
 function refreshAll() {
@@ -303,11 +316,20 @@ async function applySub(sub: Subscription, silent = false) {
   applying.value = sub.id;
   try {
     let content = sub.fileContent || sub.pasteContent || "";
+    let needConvert = sub.format !== "clash" && !sub.fileContent;
     if (!content && sub.type === "remote" && sub.url) {
       content = await fetchSubscriptionUrl(sub.url);
+      needConvert = true;
+    }
+    if (needConvert && content) {
       try {
-        content = sub.format === "clash" ? content : await convertContent(content, sub.format);
-      } catch {}
+        content = await convertContent(content, sub.format);
+      } catch (e: any) {
+        show(`${sub.name}: ${e}`, "error");
+        sub.fileContent = "";
+        applying.value = null;
+        return;
+      }
       sub.fileContent = content;
     }
     if (!content) {
@@ -319,10 +341,10 @@ async function applySub(sub: Subscription, silent = false) {
       finalContent = content + "\n" + app.overrideMergeContent;
     }
     await writeConfigOnly(finalContent);
-    app.setSubData(finalContent);
-    if (!app.proxyRunning) {
-      try { await app.startCoreCmd(); } catch {}
+    if (app.proxyRunning) {
+      try { await app.stopCoreCmd(); } catch {}
     }
+    try { await app.startCoreCmd(); } catch {}
     sub.lastUpdate = new Date().toISOString().split("T")[0];
     sub.timeAgo = t("subscriptions.justNow");
     if (!silent) {
@@ -518,8 +540,6 @@ function parseRules(content: string, format: ConfigFormat): ParsedRule[] {
       return parseRulesFromSingbox(content);
     case "v2rayn":
       return parseRulesFromV2rayN(content);
-    case "openvpn":
-      return [];
     default:
       return parseRulesFromYaml(content);
   }
@@ -604,7 +624,6 @@ function serializeRules(rules: ParsedRule[], format: ConfigFormat): string {
     case "singbox":
       return serializeRulesAsSingbox(rules);
     case "v2rayn":
-    case "openvpn":
       return "";
     default:
       return serializeRulesAsYaml(rules);
@@ -792,8 +811,6 @@ const editFilePlaceholder = computed(() => {
       return "dm1lc3M6Ly9... (Base64 encoded)\nss://... \ntrojan://...";
     case "singbox":
       return '{\n  "outbounds": [\n    {\n      "type": "shadowsocks",\n      "tag": "proxy1",\n      "server": "example.com",\n      "server_port": 443,\n      "method": "aes-256-gcm",\n      "password": "password"\n    }\n  ]\n}';
-    case "openvpn":
-      return "client\ndev tun\nproto udp\nremote example.com 1194\nresolv-retry infinite\nnobind\npersist-key\npersist-tun\n...";
     default:
       return "";
   }
@@ -910,7 +927,6 @@ function formatLabel(f: ConfigFormat): string {
     case "clash": return t("subscriptions.formatClash");
     case "v2rayn": return t("subscriptions.formatV2rayN");
     case "singbox": return t("subscriptions.formatSingbox");
-    case "openvpn": return t("subscriptions.formatOpenvpn");
   }
 }
 
@@ -1050,7 +1066,6 @@ function typeIcon(type: ProfileType) {
                   <option value="clash">{{ t('subscriptions.formatClash') }}</option>
                   <option value="v2rayn">{{ t('subscriptions.formatV2rayN') }}</option>
                   <option value="singbox">{{ t('subscriptions.formatSingbox') }}</option>
-                  <option value="openvpn">{{ t('subscriptions.formatOpenvpn') }}</option>
                 </select>
               </div>
             </div>
@@ -1101,7 +1116,6 @@ function typeIcon(type: ProfileType) {
                   <option value="clash">{{ t('subscriptions.formatClash') }}</option>
                   <option value="v2rayn">{{ t('subscriptions.formatV2rayN') }}</option>
                   <option value="singbox">{{ t('subscriptions.formatSingbox') }}</option>
-                  <option value="openvpn">{{ t('subscriptions.formatOpenvpn') }}</option>
                 </select>
               </div>
 
@@ -1244,9 +1258,9 @@ function typeIcon(type: ProfileType) {
           <div class="rules-dialog" :style="{ backgroundColor: 'var(--bg-secondary)' }" @click.stop>
             <h3 class="dialog-title">{{ t('subscriptions.ctxEditRules') }} — {{ editFileTarget?.name }}</h3>
             <div class="rules-body">
-              <template v-if="parsedFormat === 'v2rayn' || parsedFormat === 'openvpn'">
+              <template v-if="parsedFormat === 'v2rayn'">
                 <div class="rules-empty" style="width:100%">
-                  {{ parsedFormat === 'v2rayn' ? 'v2rayN 格式无规则定义' : 'OpenVPN 格式无规则定义' }}
+                  {{ 'v2rayN 格式无规则定义' }}
                 </div>
               </template>
               <template v-else>

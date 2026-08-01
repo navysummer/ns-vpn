@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import i18n from "@/locales";
-import yaml from "js-yaml";
 import {
   getConfig, updateConfig, type AppConfig,
   getTraffic, type TrafficData,
@@ -98,89 +97,10 @@ const bgColor = ref(local?.bgColor ?? "default");
   const coreVersion = ref("v1.18.0");
   const rulesCount = ref(0);
 
-  // ---- Subscription data (parsed from content on apply) ----
-  interface SubProxyGroup {
-    name: string;
-    type: string;
-    now?: string;
-    all: { name: string; type: string; delay?: number }[];
-  }
-  interface SubRule {
-    type: string;
-    payload: string;
-    proxy: string;
-    behavior: string;
-  }
-const subProxyGroups = ref<SubProxyGroup[]>([]);
-const subRules = ref<SubRule[]>([]);
 const activeSubId = ref<string | null>(null);
 const activeSubName = ref<string>("");
 const activeSubUrl = ref<string>("");
 const activeSubUpdateTime = ref<string>("");
-
-  function setSubData(content: string) {
-    try {
-      const doc = yaml.load(content) as any;
-      if (!doc) {
-        subProxyGroups.value = [];
-        subRules.value = [];
-        return;
-      }
-
-      const proxiesMap = new Map<string, string>();
-      if (Array.isArray(doc.proxies)) {
-        for (const p of doc.proxies) {
-          if (p.name) proxiesMap.set(p.name, p.type || "");
-        }
-      }
-
-      if (Array.isArray(doc["proxy-groups"])) {
-        subProxyGroups.value = doc["proxy-groups"].map((g: any) => {
-          const rawType = g.type || "Selector";
-          const typeMap: Record<string, string> = { select: "Selector", "url-test": "URLTest", fallback: "Fallback", "load-balance": "LoadBalance", relay: "Relay" };
-          return {
-            name: g.name || "",
-            type: typeMap[rawType.toLowerCase()] || rawType,
-            now: g.now || g.proxies?.[0] || "",
-            all: (g.proxies || []).map((p: string) => ({
-              name: p,
-              type: proxiesMap.get(p) || "",
-              delay: undefined,
-            })),
-          };
-        });
-      } else if (Array.isArray(doc.proxies)) {
-        subProxyGroups.value = [{
-          name: "Proxy",
-          type: "Selector",
-          now: doc.proxies[0]?.name || "",
-          all: doc.proxies.map((p: any) => ({
-            name: p.name || "",
-            type: p.type || "",
-            delay: undefined,
-          })),
-        }];
-      } else {
-        subProxyGroups.value = [];
-      }
-
-      if (Array.isArray(doc.rules)) {
-        subRules.value = doc.rules.map((r: string) => {
-          const parts = r.split(",").map((s: string) => s.trim());
-          const type = parts[0] || "";
-          const proxy = parts[parts.length - 1] || "";
-          const payload = parts.slice(1, -1).join(",") || "";
-          const behavior = type.startsWith("DOMAIN") ? "Domain" : type.startsWith("IP") || type === "GEOIP" ? "IPCIDR" : "Other";
-          return { type, payload, proxy, behavior };
-        });
-      } else {
-        subRules.value = [];
-      }
-    } catch {
-      subProxyGroups.value = [];
-      subRules.value = [];
-    }
-  }
 
   const isDark = computed(() => {
     if (theme.value === "auto") return window.matchMedia("(prefers-color-scheme: dark)").matches;
@@ -258,23 +178,21 @@ const activeSubUpdateTime = ref<string>("");
     } catch { /* backend not available */ }
   }
 
-  // ---- Polling ----
-  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  // ---- Data fetch (no timers, called explicitly) ----
 
-  async function pollTraffic() {
+  async function fetchTraffic() {
     try {
-      const data = await getTraffic();
-      traffic.value = data;
+      traffic.value = await getTraffic();
     } catch {}
   }
 
-  async function pollProxies() {
+  async function fetchProxies() {
     try {
       proxyGroups.value = await getProxies();
     } catch {}
   }
 
-  async function pollConnections() {
+  async function fetchConnections() {
     try {
       const data = await getConnections();
       connections.value = data.connections;
@@ -283,14 +201,14 @@ const activeSubUpdateTime = ref<string>("");
     } catch {}
   }
 
-  async function pollRules() {
+  async function fetchRules() {
     try {
       rules.value = await getRules();
       rulesCount.value = rules.value.length;
     } catch {}
   }
 
-  async function pollLogs() {
+  async function fetchLogs() {
     try {
       const entries = await getLogs();
       if (entries.length > 0) {
@@ -299,34 +217,11 @@ const activeSubUpdateTime = ref<string>("");
     } catch {}
   }
 
-  async function pollCoreStatus() {
+  async function fetchCoreStatus() {
     try {
       const status = await getCoreStatus();
       proxyRunning.value = status.running;
     } catch {}
-  }
-
-  function startPolling() {
-    if (pollInterval) return;
-    pollTraffic();
-    pollProxies();
-    pollCoreStatus();
-    pollInterval = setInterval(() => {
-      pollTraffic();
-      pollConnections();
-      pollRules();
-      pollLogs();
-      pollCoreStatus();
-    }, 2000);
-    // Proxies less frequently
-    setInterval(pollProxies, 10000);
-  }
-
-  function stopPolling() {
-    if (pollInterval) {
-      clearInterval(pollInterval);
-      pollInterval = null;
-    }
   }
 
   // ---- Actions ----
@@ -358,10 +253,24 @@ const activeSubUpdateTime = ref<string>("");
     }
   }
 
+  async function waitForCore(attempts = 20) {
+    for (let i = 0; i < attempts; i++) {
+      try {
+        await getProxies();
+        return;
+      } catch {}
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
   async function startCoreCmd() {
     try {
       await startCore();
       proxyRunning.value = true;
+      await waitForCore();
+      await fetchProxies();
+      await fetchRules();
+      await fetchConnections();
     } catch {}
   }
 
@@ -369,13 +278,18 @@ const activeSubUpdateTime = ref<string>("");
     try {
       await stopCore();
       proxyRunning.value = false;
+      proxyGroups.value = [];
+      connections.value = [];
+      rules.value = [];
+      rulesCount.value = 0;
+      traffic.value = { upload_speed: 0, download_speed: 0, upload_total: 0, download_total: 0, active_connections: 0 };
     } catch {}
   }
 
   async function selectProxyNode(group: string, name: string) {
     try {
       await tauriSelectProxy(group, name);
-      await pollProxies();
+      await fetchProxies();
     } catch {}
   }
 
@@ -386,11 +300,11 @@ const activeSubUpdateTime = ref<string>("");
   }
 
   async function closeConn(id: string) {
-    try { await tauriCloseConnection(id); await pollConnections(); } catch {}
+    try { await tauriCloseConnection(id); await fetchConnections(); } catch {}
   }
 
   async function closeAllConns() {
-    try { await tauriCloseAllConnections(); await pollConnections(); } catch {}
+    try { await tauriCloseAllConnections(); await fetchConnections(); } catch {}
   }
 
   // Persist local settings
@@ -421,13 +335,13 @@ const activeSubUpdateTime = ref<string>("");
     proxyRunning, traffic, proxyGroups, connections, rules, logs,
     coreVersion, rulesCount, connectionUploadTotal, connectionDownloadTotal,
     currentProxyGroup, currentNode,
-    // Subscription data
-    subProxyGroups, subRules, setSubData, activeSubId, activeSubName, activeSubUrl, activeSubUpdateTime,
+    // Subscription metadata
+    activeSubId, activeSubName, activeSubUrl, activeSubUpdateTime,
     // Actions
     setTheme, setProxyRunning, toggleSidebar, setSystemProxyMode,
     setTunModeEnabled, changeProxyMode, startCoreCmd, stopCoreCmd,
     selectProxyNode, testNodeDelay, closeConn, closeAllConns,
-    syncFromBackend, pushToBackend, startPolling, stopPolling,
-    pollTraffic, pollProxies, pollConnections, pollRules, pollLogs, pollCoreStatus,
+    syncFromBackend, pushToBackend,
+    waitForCore, fetchTraffic, fetchProxies, fetchConnections, fetchRules, fetchLogs, fetchCoreStatus,
   };
 });

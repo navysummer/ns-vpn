@@ -9,8 +9,7 @@ const app = useAppStore();
 const { t } = useI18n();
 
 const proxyGroups = computed(() => {
-  const groups = app.proxyRunning ? app.proxyGroups : app.subProxyGroups;
-  return groups.filter(g => g.name !== "GLOBAL");
+  return app.proxyGroups.filter(g => g.name !== "GLOBAL");
 });
 
 const selectedGroup = ref("");

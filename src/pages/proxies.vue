@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted } from "vue";
 import { RefreshCw, Zap, Globe, Shield, Route, Gauge } from "lucide-vue-next";
 import { useToast } from "@/utils/toast";
 import { useAppStore } from "@/stores/app";
@@ -9,16 +9,19 @@ const app = useAppStore();
 const { show } = useToast();
 const { t } = useI18n();
 
+onMounted(() => {
+  if (app.proxyRunning) {
+    app.fetchProxies();
+  }
+});
+
 const selectedGroup = ref("");
 const testingNodes = ref<Set<string>>(new Set());
 const testingAll = ref(false);
 const nodeDelays = ref<Map<string, number>>(new Map());
 
 const proxyGroups = computed(() => {
-  if (app.proxyRunning && app.proxyGroups.length > 0) {
-    return app.proxyGroups;
-  }
-  return app.subProxyGroups;
+  return app.proxyGroups;
 });
 
 const filteredGroups = computed(() => {
@@ -96,15 +99,17 @@ function groupTypeLabel(type: string): string {
 
 function nodeTypeIcon(type: string): string {
   switch (type) {
-    case "Vless": case "Vmess": return "V";
-    case "Trojan": return "T";
-    case "Shadowsocks": case "ss": return "S";
-    case "Hysteria": case "Hysteria2": return "H";
-    case "Direct": return "D";
-    case "Reject": return "R";
-    case "URLTest": return "U";
-    case "Fallback": return "F";
-    case "LoadBalance": return "L";
+    case "Vless": case "Vmess": case "vless": case "vmess": return "V";
+    case "Trojan": case "trojan": return "T";
+    case "Shadowsocks": case "ss": case "shadowsocks": return "S";
+    case "Hysteria": case "Hysteria2": case "hysteria": case "hysteria2": return "H";
+    case "Snell": case "snell": return "Sn";
+    case "AnyTLS": case "anytls": return "A";
+    case "Direct": case "direct": return "D";
+    case "Reject": case "reject": return "R";
+    case "URLTest": case "urltest": return "U";
+    case "Fallback": case "fallback": return "F";
+    case "LoadBalance": case "loadbalance": return "L";
     default: return "?";
   }
 }
@@ -322,6 +327,8 @@ function nodeTypeIcon(type: string): string {
 .type-trojan { background: rgba(255, 69, 58, 0.12); color: var(--red); }
 .type-shadowsocks, .type-ss { background: rgba(52, 199, 89, 0.12); color: var(--green); }
 .type-hysteria, .type-hysteria2 { background: rgba(255, 159, 10, 0.12); color: var(--orange); }
+.type-snell { background: rgba(191, 90, 242, 0.12); color: #bf5af2; }
+.type-anytls { background: rgba(79, 142, 247, 0.12); color: var(--accent); }
 .type-direct { background: rgba(52, 199, 89, 0.12); color: var(--green); }
 .type-reject { background: rgba(255, 69, 58, 0.12); color: var(--red); }
 
