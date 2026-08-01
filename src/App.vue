@@ -6,6 +6,7 @@ import ToastContainer from "@/components/ToastContainer.vue";
 import ScrollToTop from "@/components/ScrollToTop.vue";
 import CoreInstallOverlay from "@/components/CoreInstallOverlay.vue";
 import { checkCoreInstalled, installCoreWithProgress, autoStartCore, writeConfigOnly, fetchSubscriptionUrl, convertContent } from "@/utils/tauri";
+import { isEnabled as autostartIsEnabled } from "@tauri-apps/plugin-autostart";
 
 const app = useAppStore();
 
@@ -76,6 +77,14 @@ watch(
 onMounted(async () => {
   app.syncFromBackend();
   app.startPolling();
+
+  // Sync autostart state from OS
+  try {
+    const osEnabled = await autostartIsEnabled();
+    app.startAtBoot = osEnabled;
+  } catch {
+    // not available on this platform
+  }
 
   try {
     const info = await checkCoreInstalled();

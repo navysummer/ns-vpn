@@ -132,6 +132,7 @@ pub fn run() {
             commands::core_cmd::stop_core,
             commands::core_cmd::restart_core,
             commands::core_cmd::get_core_status,
+            commands::core_cmd::get_core_version,
             commands::core_cmd::auto_start_core,
             commands::core_download::download_core,
             commands::core_download::check_core_installed,

@@ -115,7 +115,8 @@
       "timezone": "时区",
       "autoRefresh": "自动刷新",
       "asn": "自治域",
-      "fetchFailed": "获取失败"
+      "fetchFailed": "获取失败",
+      "viaProxy": "通过代理"
     },
     "coreInfo": {
       "title": "核心信息",
@@ -131,7 +132,7 @@
       "autoStart": "开机自启",
       "runMode": "运行模式",
       "lastCheckUpdate": "最后检查更新",
-      "appVersion": "VPN 版本",
+      "appVersion": "ns-vpn 版本",
       "openSettings": "打开设置"
     },
     "currentProxy": {

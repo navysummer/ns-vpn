@@ -6,7 +6,6 @@ pub async fn start_core(state: State<'_, AppState>) -> Result<(), String> {
     let config = state.config.read().clone();
     state.core_manager.start(&config).await?;
     *state.proxy_running.write() = true;
-    // Persist proxy_running = true to config
     {
         let mut cfg = state.config.write();
         cfg.proxy_running = true;
@@ -19,7 +18,6 @@ pub async fn start_core(state: State<'_, AppState>) -> Result<(), String> {
 pub async fn stop_core(state: State<'_, AppState>) -> Result<(), String> {
     state.core_manager.stop().await?;
     *state.proxy_running.write() = false;
-    // Persist proxy_running = false to config
     {
         let mut cfg = state.config.write();
         cfg.proxy_running = false;
@@ -59,6 +57,15 @@ pub fn get_core_status(state: State<AppState>) -> Result<CoreStatus, String> {
         api_port: config.api_port,
         mixed_port: config.mixed_port,
     })
+}
+
+#[tauri::command]
+pub async fn get_core_version(state: State<'_, AppState>) -> Result<String, String> {
+    if let Some(client) = state.core_manager.client() {
+        client.get_version().await
+    } else {
+        Ok("unknown".to_string())
+    }
 }
 
 #[derive(serde::Serialize)]

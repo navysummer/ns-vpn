@@ -59,6 +59,7 @@ export const startCore = () => tauriInvoke("start_core");
 export const stopCore = () => tauriInvoke("stop_core");
 export const restartCore = () => tauriInvoke("restart_core");
 export const getCoreStatus = () => tauriInvoke<CoreStatus>("get_core_status");
+export const getCoreVersion = () => tauriInvoke<string>("get_core_version");
 export const autoStartCore = () => tauriInvoke<boolean>("auto_start_core");
 
 // ---- Core Download ----

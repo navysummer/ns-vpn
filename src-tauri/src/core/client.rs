@@ -66,8 +66,6 @@ impl MihomoClient {
         if !resp.status().is_success() {
             return Err(format!("Traffic API error: HTTP {}", resp.status()));
         }
-        // /traffic is an SSE-style stream (one JSON line per second).
-        // Read a single line so the request does not hang forever.
         let mut lines = resp.bytes_stream();
         use futures_util::StreamExt;
         let mut buf: Vec<u8> = Vec::new();
@@ -87,6 +85,16 @@ impl MihomoClient {
             }
         }
         Ok(entries)
+    }
+
+    pub async fn get_version(&self) -> Result<String, String> {
+        let url = format!("{}/version", self.base_url);
+        let resp = self.client.get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Version request failed: {}", e))?;
+        let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+        Ok(data["version"].as_str().unwrap_or("unknown").to_string())
     }
 
     pub async fn get_logs(&self) -> Result<Vec<LogEntry>, String> {

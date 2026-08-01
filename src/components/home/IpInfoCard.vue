@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { MapPin, RefreshCw, Eye, EyeOff } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
@@ -26,7 +26,8 @@ async function fetchIp() {
   fetchFailed.value = false;
   viaProxy.value = false;
   try {
-    const proxyUrl = app.proxyRunning ? "http://127.0.0.1:7890" : undefined;
+    const useProxy = app.systemProxy || app.tunMode;
+    const proxyUrl = useProxy ? "http://127.0.0.1:7890" : undefined;
     const info = await fetchIpInfo(proxyUrl);
     ip.value = info.ip;
     country.value = info.country;
@@ -35,13 +36,18 @@ async function fetchIp() {
     org.value = info.org;
     city.value = info.city;
     timezone.value = info.timezone;
-    viaProxy.value = !!proxyUrl;
+    viaProxy.value = useProxy;
   } catch {
     fetchFailed.value = true;
     ip.value = t("home.ipInfo.fetchFailed");
   }
   loading.value = false;
 }
+
+watch(() => [app.systemProxy, app.tunMode], () => {
+  viaProxy.value = false;
+  fetchIp();
+});
 
 onMounted(fetchIp);
 </script>

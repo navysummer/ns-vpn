@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { Cpu } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
 import { useI18n } from "vue-i18n";
 import EnhancedCard from "@/components/EnhancedCard.vue";
+import { getCoreVersion } from "@/utils/tauri";
 
 const app = useAppStore();
 const { t } = useI18n();
 
 const uptime = ref(0);
+const coreVersion = ref("");
 let interval: ReturnType<typeof setInterval> | null = null;
 
 function formatUptime(ms: number): string {
@@ -18,7 +20,12 @@ function formatUptime(ms: number): string {
   return `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    coreVersion.value = await getCoreVersion();
+  } catch {
+    coreVersion.value = "unknown";
+  }
   interval = setInterval(() => { if (app.proxyRunning) uptime.value += 1000; }, 1000);
 });
 
@@ -32,7 +39,7 @@ onUnmounted(() => {
     <div class="info-list">
       <div class="info-row">
         <span class="info-label">{{ t('home.coreInfo.coreVersion') }}</span>
-        <span class="info-value mono">{{ app.coreVersion }}</span>
+        <span class="info-value mono">{{ coreVersion }}</span>
       </div>
       <div class="info-row">
         <span class="info-label">{{ t('home.coreInfo.systemProxyAddr') }}</span>

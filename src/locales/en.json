@@ -115,7 +115,8 @@
       "timezone": "Timezone",
       "autoRefresh": "Auto Refresh",
       "asn": "ASN",
-      "fetchFailed": "Fetch failed"
+      "fetchFailed": "Fetch failed",
+      "viaProxy": "via Proxy"
     },
     "coreInfo": {
       "title": "Core Info",
@@ -131,7 +132,7 @@
       "autoStart": "Auto Start",
       "runMode": "Run Mode",
       "lastCheckUpdate": "Last Update Check",
-      "appVersion": "VPN Version",
+      "appVersion": "ns-vpn Version",
       "openSettings": "Open Settings"
     },
     "currentProxy": {
