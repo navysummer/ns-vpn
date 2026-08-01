@@ -44,8 +44,7 @@ pub async fn write_config_only(
 
     if rules.is_null() {
         rules = serde_yaml_ng::Value::Sequence(
-            vec![serde_yaml_ng::to_value(serde_json::json!(["MATCH", "Proxy"]))
-                .unwrap_or(serde_yaml_ng::Value::Null)]
+            vec![serde_yaml_ng::Value::String("MATCH,Proxy".to_string())]
         );
     }
 
@@ -1059,5 +1058,55 @@ pub fn convert_content(content: String, format: String) -> Result<String, String
         "v2rayn" => convert_v2rayn_to_clash(&content),
         "singbox" => convert_singbox_to_clash(&content),
         _ => Err(format!("Unsupported format: {}", format)),
+    }
+}
+
+#[cfg(test)]
+mod temp_wco_tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    #[test]
+    fn wco_clash_no_groups() {
+        let content = std::fs::read_to_string("/tmp/clash.yaml").unwrap();
+        let sub_yaml: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content).unwrap_or(serde_yaml_ng::Value::Null);
+        let proxies = sub_yaml.get("proxies").cloned().unwrap_or(serde_yaml_ng::Value::Null);
+        let mut proxy_groups = sub_yaml.get("proxy-groups").cloned().unwrap_or(serde_yaml_ng::Value::Null);
+        let mut rules = sub_yaml.get("rules").cloned().unwrap_or(serde_yaml_ng::Value::Null);
+
+        if proxy_groups.is_null() {
+            if let Some(arr) = proxies.as_sequence() {
+                let names: Vec<String> = arr.iter()
+                    .filter_map(|p| p.get("name").and_then(|n| n.as_str()).map(|s| s.to_string()))
+                    .collect();
+                if !names.is_empty() {
+                    proxy_groups = serde_yaml_ng::Value::Sequence(
+                        vec![serde_yaml_ng::to_value(serde_json::json!({
+                            "name": "Proxy",
+                            "type": "select",
+                            "proxies": names,
+                        })).unwrap_or(serde_yaml_ng::Value::Null)]
+                    );
+                }
+            }
+        }
+        if rules.is_null() {
+            rules = serde_yaml_ng::Value::Sequence(
+                vec![serde_yaml_ng::to_value(serde_json::json!(["MATCH", "Proxy"]))
+                    .unwrap_or(serde_yaml_ng::Value::Null)]
+            );
+        }
+        let meow_config = serde_json::json!({
+            "mixed-port": 7890,
+            "proxies": proxies,
+            "proxy-groups": proxy_groups,
+            "rules": rules,
+        });
+        let yaml = serde_yaml_ng::to_string(&meow_config).unwrap();
+        println!("OUTPUT LEN: {}", yaml.len());
+        println!("OUTPUT HEAD:\n{}", yaml.chars().take(400).collect::<String>());
+        let back: serde_yaml_ng::Value = serde_yaml_ng::from_str(&yaml).unwrap();
+        println!("ROUNDTRIP proxies: {}", back.get("proxies").and_then(|p| p.as_sequence()).map(|a| a.len()).unwrap_or(0));
+        println!("ROUNDTRIP groups: {}", back.get("proxy-groups").and_then(|p| p.as_sequence()).map(|a| a.len()).unwrap_or(0));
     }
 }
