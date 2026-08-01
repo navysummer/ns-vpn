@@ -12,12 +12,15 @@ const { show } = useToast();
 const router = useRouter();
 const { t } = useI18n();
 
-const groups = computed(() => app.proxyRunning ? app.proxyGroups : app.subProxyGroups);
-const groupCount = computed(() => groups.value.filter(g => g.type === "Selector").length);
+const groups = computed(() => {
+  const gs = app.proxyRunning ? app.proxyGroups : app.subProxyGroups;
+  return gs.filter(g => g.name !== "GLOBAL");
+});
+const groupCount = computed(() => groups.value.length);
 const proxyCount = computed(() => {
   let total = 0;
   for (const g of groups.value) {
-    if (g.type === "Selector") total += g.all.length;
+    total += g.all.length;
   }
   return total;
 });

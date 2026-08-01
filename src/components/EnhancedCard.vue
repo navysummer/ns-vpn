@@ -47,7 +47,6 @@ withDefaults(defineProps<Props>(), {
   border-radius: 12px;
   border: 1px solid var(--border);
   background-color: var(--card-bg);
-  overflow: hidden;
 }
 
 .ec-header {

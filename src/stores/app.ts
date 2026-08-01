@@ -135,16 +135,20 @@ const activeSubUpdateTime = ref<string>("");
       }
 
       if (Array.isArray(doc["proxy-groups"])) {
-        subProxyGroups.value = doc["proxy-groups"].map((g: any) => ({
-          name: g.name || "",
-          type: g.type || "Selector",
-          now: g.now || g.proxies?.[0] || "",
-          all: (g.proxies || []).map((p: string) => ({
-            name: p,
-            type: proxiesMap.get(p) || "",
-            delay: undefined,
-          })),
-        }));
+        subProxyGroups.value = doc["proxy-groups"].map((g: any) => {
+          const rawType = g.type || "Selector";
+          const typeMap: Record<string, string> = { select: "Selector", "url-test": "URLTest", fallback: "Fallback", "load-balance": "LoadBalance", relay: "Relay" };
+          return {
+            name: g.name || "",
+            type: typeMap[rawType.toLowerCase()] || rawType,
+            now: g.now || g.proxies?.[0] || "",
+            all: (g.proxies || []).map((p: string) => ({
+              name: p,
+              type: proxiesMap.get(p) || "",
+              delay: undefined,
+            })),
+          };
+        });
       } else if (Array.isArray(doc.proxies)) {
         subProxyGroups.value = [{
           name: "Proxy",
