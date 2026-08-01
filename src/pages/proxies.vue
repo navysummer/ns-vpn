@@ -10,8 +10,9 @@ const { show } = useToast();
 const { t } = useI18n();
 
 const selectedGroup = ref("");
-const testingNode = ref<string | null>(null);
+const testingNodes = ref<Set<string>>(new Set());
 const testingAll = ref(false);
+const nodeDelays = ref<Map<string, number>>(new Map());
 
 const proxyGroups = computed(() => {
   if (app.proxyRunning && app.proxyGroups.length > 0) {
@@ -20,8 +21,16 @@ const proxyGroups = computed(() => {
   return app.subProxyGroups;
 });
 
+const filteredGroups = computed(() => {
+  const groups = proxyGroups.value;
+  if (app.proxyMode === "global") {
+    return groups.filter(g => g.name === "GLOBAL");
+  }
+  return groups.filter(g => g.name !== "GLOBAL");
+});
+
 const currentGroup = computed(() => {
-  return proxyGroups.value.find(g => g.name === selectedGroup.value);
+  return filteredGroups.value.find(g => g.name === selectedGroup.value);
 });
 
 const currentNodes = computed(() => {
@@ -30,9 +39,11 @@ const currentNodes = computed(() => {
 
 const isDirectMode = computed(() => app.proxyMode === "direct");
 
-watch(() => proxyGroups.value, (groups) => {
-  if (groups.length > 0 && !selectedGroup.value) {
-    selectedGroup.value = groups[0].name;
+watch(() => filteredGroups.value, (groups) => {
+  if (groups.length > 0) {
+    if (!selectedGroup.value || !groups.find(g => g.name === selectedGroup.value)) {
+      selectedGroup.value = groups[0].name;
+    }
   }
 }, { immediate: true });
 
@@ -47,23 +58,21 @@ async function selectNode(nodeName: string) {
 
 async function testNodeDelay(nodeName: string) {
   if (!app.proxyRunning) return;
-  testingNode.value = nodeName;
+  testingNodes.value = new Set(testingNodes.value).add(nodeName);
   const delay = await app.testNodeDelay(nodeName);
-  if (currentGroup.value) {
-    const node = currentGroup.value.all.find(n => n.name === nodeName);
-    if (node) node.delay = delay;
-  }
-  setTimeout(() => { testingNode.value = null; }, 1500);
+  const next = new Map(nodeDelays.value);
+  next.set(nodeName, delay);
+  nodeDelays.value = next;
+  const nextSet = new Set(testingNodes.value);
+  nextSet.delete(nodeName);
+  testingNodes.value = nextSet;
 }
 
 async function testAllDelay() {
   if (!app.proxyRunning || !currentGroup.value) return;
   testingAll.value = true;
   const group = currentGroup.value;
-  for (const node of group.all) {
-    const delay = await app.testNodeDelay(node.name);
-    node.delay = delay;
-  }
+  await Promise.all(group.all.map(node => testNodeDelay(node.name)));
   setTimeout(() => { testingAll.value = false; }, 1000);
 }
 
@@ -129,9 +138,17 @@ function nodeTypeIcon(type: string): string {
     <template v-else>
       <div class="group-selector-bar">
         <div class="group-selector">
-          <select v-model="selectedGroup" class="group-select">
-            <option v-for="g in proxyGroups" :key="g.name" :value="g.name">{{ g.name }}</option>
-          </select>
+          <template v-if="app.proxyMode === 'global'">
+            <div class="global-group-label">
+              <Globe :size="18" class="global-icon" />
+              <span class="global-group-name">GLOBAL</span>
+            </div>
+          </template>
+          <template v-else>
+            <select v-model="selectedGroup" class="group-select">
+              <option v-for="g in filteredGroups" :key="g.name" :value="g.name">{{ g.name }}</option>
+            </select>
+          </template>
           <div class="group-info-row">
             <span class="group-type-badge">{{ currentGroup ? groupTypeLabel(currentGroup.type) : '' }}</span>
             <span class="group-now">{{ currentGroup?.now ?? '' }}</span>
@@ -146,41 +163,44 @@ function nodeTypeIcon(type: string): string {
         </div>
       </div>
 
-      <div v-if="proxyGroups.length === 0" class="proxy-empty-state">
+      <div v-if="filteredGroups.length === 0" class="proxy-empty-state">
         <Shield :size="48" :style="{ color: 'var(--text-secondary)', opacity: 0.3 }" />
         <h3>{{ t('proxies.noGroups') }}</h3>
         <p>{{ app.proxyRunning ? t('proxies.noGroupsDesc') : t('proxies.coreNotRunning') }}</p>
       </div>
 
-      <div v-else class="nodes-container">
+      <div v-else-if="filteredGroups.length > 0" class="nodes-container">
         <div class="nodes-header">
           <span class="nodes-title">{{ currentGroup?.name }}</span>
           <span v-if="!app.proxyRunning" class="offline-badge">{{ t('proxies.offline') }}</span>
         </div>
         <div class="nodes-grid">
           <div v-for="node in currentNodes" :key="node.name"
-            class="node-card"
-            :class="{ 'node-active': node.name === currentGroup?.now }"
-            @click="selectNode(node.name)"
-          >
+            class="node-card">
             <div class="node-top">
-              <div class="node-radio" :class="{ checked: node.name === currentGroup?.now }">
-                <div class="radio-dot"></div>
-              </div>
               <span class="node-type-badge" :class="'type-' + node.type.toLowerCase()">{{ nodeTypeIcon(node.type) }}</span>
               <span class="node-name">{{ node.name }}</span>
+              <span class="node-type-label">{{ node.type }}</span>
             </div>
             <div class="node-bottom">
-              <div class="node-delay" :style="{ color: delayColor(node.delay ?? 0) }">
-                <Zap v-if="(node.delay ?? 0) > 0" :size="10" />
-                <span v-if="(node.delay ?? 0) > 0">{{ node.delay }} ms</span>
-                <span v-else class="delay-na">-</span>
+              <div class="node-delay" :style="{ color: delayColor(nodeDelays.get(node.name) ?? 0) }">
+                <span v-if="testingNodes.has(node.name)" class="delay-testing">测试中</span>
+                <template v-else-if="!nodeDelays.has(node.name)">
+                  <span class="delay-na">待测</span>
+                </template>
+                <template v-else-if="nodeDelays.get(node.name) === 0">
+                  <span class="delay-fail">超时</span>
+                </template>
+                <template v-else>
+                  <Zap :size="10" />
+                  <span>{{ nodeDelays.get(node.name) }} ms</span>
+                </template>
               </div>
-              <button class="node-test-btn" :class="{ spinning: testingNode === node.name }"
+              <button class="node-test-btn" :class="{ spinning: testingNodes.has(node.name) }"
                 @click.stop="testNodeDelay(node.name)"
                 :title="t('proxies.testDelay')"
               >
-                <RefreshCw :size="12" :class="{ spin: testingNode === node.name }" />
+                <RefreshCw :size="12" :class="{ spin: testingNodes.has(node.name) }" />
               </button>
             </div>
           </div>
@@ -227,6 +247,13 @@ function nodeTypeIcon(type: string): string {
   border: 1px solid var(--border); background-color: var(--card-bg);
 }
 .group-selector { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.global-group-label {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 8px;
+  background-color: var(--bg-tertiary);
+}
+.global-icon { color: var(--accent); flex-shrink: 0; }
+.global-group-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
 .group-select {
   width: 100%; padding: 8px 12px; padding-right: 32px;
   border-radius: 8px; border: 1px solid var(--border);
@@ -280,28 +307,11 @@ function nodeTypeIcon(type: string): string {
   display: flex; flex-direction: column; gap: 8px;
   padding: 12px 14px; border-radius: 10px;
   border: 1px solid var(--border); background-color: var(--card-bg);
-  cursor: pointer; transition: all 150ms ease;
-}
-.node-card:hover { border-color: var(--accent); }
-.node-active {
-  border-color: var(--accent);
-  background-color: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-
-.node-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.node-radio {
-  width: 16px; height: 16px; border-radius: 50%;
-  border: 2px solid var(--border); flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
   transition: all 150ms ease;
 }
-.node-radio.checked { border-color: var(--accent); }
-.radio-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: transparent; transition: all 150ms ease;
-}
-.node-radio.checked .radio-dot { background: var(--accent); }
+.node-card:hover { border-color: var(--accent); }
 
+.node-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .node-type-badge {
   width: 20px; height: 20px; border-radius: 4px;
   display: flex; align-items: center; justify-content: center;
@@ -319,6 +329,11 @@ function nodeTypeIcon(type: string): string {
   font-size: 13px; font-weight: 500; color: var(--text-primary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.node-type-label {
+  font-size: 10px; color: var(--text-secondary); flex-shrink: 0;
+  margin-left: auto; padding: 1px 6px; border-radius: 4px;
+  background: var(--bg-tertiary); font-weight: 500;
+}
 
 .node-bottom { display: flex; align-items: center; justify-content: space-between; }
 .node-delay {
@@ -327,6 +342,8 @@ function nodeTypeIcon(type: string): string {
   font-family: "SF Mono", "Fira Code", monospace;
 }
 .delay-na { color: var(--text-secondary); font-weight: 400; }
+.delay-testing { color: var(--accent); font-size: 11px; font-weight: 500; }
+.delay-fail { color: var(--red); font-size: 11px; font-weight: 500; }
 
 .node-test-btn {
   display: flex; align-items: center; justify-content: center;
@@ -335,7 +352,7 @@ function nodeTypeIcon(type: string): string {
   cursor: pointer; color: var(--text-secondary); transition: all 150ms ease;
 }
 .node-test-btn:hover { border-color: var(--accent); color: var(--accent); }
-.node-test-btn.spinning { border-color: var(--accent); color: var(--accent); }
+.node-test-btn.spinning { border-color: var(--accent); color: var(--accent); background: rgba(79,142,247,0.08); }
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

@@ -61,13 +61,16 @@
       "updateTime": "Updated",
       "subscribe": "Subscribe",
       "subUpdated": "Subscription updated",
-      "from": "From:"
+      "from": "From:",
+      "groups": "Groups",
+      "proxies": "Proxies"
     },
     "currentNode": {
       "title": "Current Node",
       "proxyGroup": "Proxy Group",
       "selectNode": "Select Node",
       "node": "Node",
+      "current": "Current",
       "globalMode": "Global Mode",
       "directMode": "Direct Mode",
       "ruleMode": "Rule Mode"

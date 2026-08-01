@@ -14,13 +14,17 @@ const mode = ref<"system" | "tun">("system");
 
 async function toggleSystemProxy() {
   const newVal = !app.systemProxy;
+  app.systemProxy = newVal;
   await app.setSystemProxyMode(newVal);
+  await app.pushToBackend();
   show(newVal ? t("home.networkSettings.systemProxyOn") : t("home.networkSettings.systemProxyOff"), "info");
 }
 
 async function toggleTun() {
   const newVal = !app.tunMode;
+  app.tunMode = newVal;
   await app.setTunModeEnabled(newVal);
+  await app.pushToBackend();
   show(newVal ? t("home.networkSettings.tunOn") : t("home.networkSettings.tunOff"), "info");
 }
 </script>

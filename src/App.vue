@@ -5,7 +5,7 @@ import Sidebar from "@/components/Sidebar.vue";
 import ToastContainer from "@/components/ToastContainer.vue";
 import ScrollToTop from "@/components/ScrollToTop.vue";
 import CoreInstallOverlay from "@/components/CoreInstallOverlay.vue";
-import { checkCoreInstalled, installCoreWithProgress, autoStartCore } from "@/utils/tauri";
+import { checkCoreInstalled, installCoreWithProgress, autoStartCore, writeConfigOnly, fetchSubscriptionUrl, convertContent } from "@/utils/tauri";
 
 const app = useAppStore();
 
@@ -84,6 +84,39 @@ onMounted(async () => {
     }
   } catch {
     // not in Tauri or error
+  }
+
+  // Auto-apply saved subscription
+  try {
+    const ACTIVE_KEY = "ns-vpn-active-sub";
+    const STORAGE_KEY = "ns-vpn-subscriptions";
+    const savedId = localStorage.getItem(ACTIVE_KEY);
+    if (savedId) {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        const subs = JSON.parse(saved);
+        const sub = subs.find((s: any) => s.id === savedId);
+        if (sub) {
+          app.activeSubId = sub.id;
+          app.activeSubName = sub.name;
+          app.activeSubUrl = sub.url || "";
+          app.activeSubUpdateTime = sub.lastUpdate || "";
+          let content = sub.fileContent || sub.pasteContent || "";
+          if (!content && sub.type === "remote" && sub.url) {
+            content = await fetchSubscriptionUrl(sub.url);
+            if (sub.format !== "clash") {
+              content = await convertContent(content, sub.format);
+            }
+          }
+          if (content) {
+            await writeConfigOnly(content);
+            app.setSubData(content);
+          }
+        }
+      }
+    }
+  } catch {
+    // auto-apply failed, ignore
   }
 
   // Auto-start core if it was running when app was closed (like Clash Verge Rev)

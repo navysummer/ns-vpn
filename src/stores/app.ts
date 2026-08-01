@@ -111,8 +111,12 @@ const bgColor = ref(local?.bgColor ?? "default");
     proxy: string;
     behavior: string;
   }
-  const subProxyGroups = ref<SubProxyGroup[]>([]);
-  const subRules = ref<SubRule[]>([]);
+const subProxyGroups = ref<SubProxyGroup[]>([]);
+const subRules = ref<SubRule[]>([]);
+const activeSubId = ref<string | null>(null);
+const activeSubName = ref<string>("");
+const activeSubUrl = ref<string>("");
+const activeSubUpdateTime = ref<string>("");
 
   function setSubData(content: string) {
     try {
@@ -414,7 +418,7 @@ const bgColor = ref(local?.bgColor ?? "default");
     coreVersion, rulesCount, connectionUploadTotal, connectionDownloadTotal,
     currentProxyGroup, currentNode,
     // Subscription data
-    subProxyGroups, subRules, setSubData,
+    subProxyGroups, subRules, setSubData, activeSubId, activeSubName, activeSubUrl, activeSubUpdateTime,
     // Actions
     setTheme, setProxyRunning, toggleSidebar, setSystemProxyMode,
     setTunModeEnabled, changeProxyMode, startCoreCmd, stopCoreCmd,

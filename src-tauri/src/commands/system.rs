@@ -8,6 +8,44 @@ pub struct SystemInfo {
     pub core_version: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct IpInfo {
+    pub ip: String,
+    pub country: String,
+    pub asn: String,
+    pub isp: String,
+    pub org: String,
+    pub city: String,
+    pub timezone: String,
+}
+
+#[tauri::command]
+pub async fn fetch_ip_info() -> Result<IpInfo, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .no_proxy()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let resp = client.get("http://ip-api.com/json/")
+        .send()
+        .await
+        .map_err(|e| format!("IP request failed: {}", e))?;
+    let data: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
+
+    Ok(IpInfo {
+        ip: data["query"].as_str().unwrap_or("").to_string(),
+        country: data["country"].as_str().unwrap_or("").to_string(),
+        asn: data["as"].as_str().unwrap_or("").to_string(),
+        isp: data["isp"].as_str().unwrap_or("").to_string(),
+        org: data["org"].as_str().unwrap_or("").to_string(),
+        city: format!("{}, {}",
+            data["city"].as_str().unwrap_or(""),
+            data["regionName"].as_str().unwrap_or("")),
+        timezone: data["timezone"].as_str().unwrap_or("").to_string(),
+    })
+}
+
 #[tauri::command]
 pub fn get_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()

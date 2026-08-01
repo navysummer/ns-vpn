@@ -114,6 +114,19 @@ export const getVersion = () => tauriInvoke<string>("get_version");
 export const getSystemInfo = () => tauriInvoke<SystemInfo>("get_system_info");
 export const openAppDir = () => tauriInvoke("open_app_dir");
 
+// ---- IP Info ----
+export interface IpInfo {
+  ip: string;
+  country: string;
+  asn: string;
+  isp: string;
+  org: string;
+  city: string;
+  timezone: string;
+}
+
+export const fetchIpInfo = () => tauriInvoke<IpInfo>("fetch_ip_info");
+
 // ---- Traffic ----
 export interface TrafficData {
   upload_speed: number;

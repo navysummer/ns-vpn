@@ -61,13 +61,16 @@
       "updateTime": "更新时间",
       "subscribe": "订阅",
       "subUpdated": "订阅已更新",
-      "from": "来自:"
+      "from": "来自:",
+      "groups": "分组",
+      "proxies": "代理"
     },
     "currentNode": {
       "title": "当前节点",
       "proxyGroup": "代理分组",
       "selectNode": "选择节点",
       "node": "节点",
+      "current": "当前节点",
       "globalMode": "全局模式",
       "directMode": "直连模式",
       "ruleMode": "规则模式"

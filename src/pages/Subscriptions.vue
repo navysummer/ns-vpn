@@ -292,9 +292,13 @@ function clearAllSubs() {
 
 const applying = ref<string | null>(null);
 
-async function applySub(sub: Subscription) {
+async function applySub(sub: Subscription, silent = false) {
   selectedSub.value = sub.id;
   activeSubId.value = sub.id;
+  app.activeSubId = sub.id;
+  app.activeSubName = sub.name;
+  app.activeSubUrl = sub.url || "";
+  app.activeSubUpdateTime = sub.lastUpdate || "";
   localStorage.setItem(ACTIVE_KEY, sub.id);
   applying.value = sub.id;
   try {
@@ -321,7 +325,9 @@ async function applySub(sub: Subscription) {
     }
     sub.lastUpdate = new Date().toISOString().split("T")[0];
     sub.timeAgo = t("subscriptions.justNow");
-    show(t("subscriptions.switchedTo", { name: sub.name }), "success");
+    if (!silent) {
+      show(t("subscriptions.switchedTo", { name: sub.name }), "success");
+    }
     localStorage.setItem("ns-vpn-active-sub", sub.id);
   } catch (e: any) {
     show(`${sub.name}: ${e}`, "error");

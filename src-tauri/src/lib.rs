@@ -148,6 +148,7 @@ pub fn run() {
             commands::system::get_system_info,
             commands::system::open_app_dir,
             commands::system::select_config_file,
+            commands::system::fetch_ip_info,
             commands::traffic::get_traffic,
             commands::logs::get_logs,
             commands::proxies::get_proxies,
