@@ -34,7 +34,9 @@
     "settings": "Settings"
   },
   "sidebar": {
-    "memory": "Memory"
+    "memory": "Memory",
+    "running": "Running",
+    "stopped": "Stopped"
   },
   "dashboard": {
     "title": "Home",

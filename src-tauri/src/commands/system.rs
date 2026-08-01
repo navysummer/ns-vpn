@@ -20,12 +20,16 @@ pub struct IpInfo {
 }
 
 #[tauri::command]
-pub async fn fetch_ip_info() -> Result<IpInfo, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(10))
-        .no_proxy()
-        .build()
-        .map_err(|e| e.to_string())?;
+pub async fn fetch_ip_info(proxy_url: Option<String>) -> Result<IpInfo, String> {
+    let mut builder = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10));
+    if let Some(ref url) = proxy_url {
+        let proxy = reqwest::Proxy::http(url).map_err(|e| e.to_string())?;
+        builder = builder.proxy(proxy);
+    } else {
+        builder = builder.no_proxy();
+    }
+    let client = builder.build().map_err(|e| e.to_string())?;
 
     let resp = client.get("http://ip-api.com/json/")
         .send()

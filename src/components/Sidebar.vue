@@ -57,7 +57,7 @@ const isActive = (path: string) => route.path === path;
       </div>
       <div class="status-row">
         <span class="status-dot" :class="{ online: app.proxyRunning }"></span>
-        <span class="status-text">{{ app.proxyRunning ? 'Running' : 'Stopped' }}</span>
+        <span class="status-text">{{ app.proxyRunning ? t('sidebar.running') : t('sidebar.stopped') }}</span>
       </div>
     </div>
   </aside>

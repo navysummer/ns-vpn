@@ -19,12 +19,15 @@ const timezone = ref("");
 const showIp = ref(false);
 const loading = ref(false);
 const fetchFailed = ref(false);
+const viaProxy = ref(false);
 
 async function fetchIp() {
   loading.value = true;
   fetchFailed.value = false;
+  viaProxy.value = false;
   try {
-    const info = await fetchIpInfo();
+    const proxyUrl = app.proxyRunning ? "http://127.0.0.1:7890" : undefined;
+    const info = await fetchIpInfo(proxyUrl);
     ip.value = info.ip;
     country.value = info.country;
     asn.value = info.asn;
@@ -32,6 +35,7 @@ async function fetchIp() {
     org.value = info.org;
     city.value = info.city;
     timezone.value = info.timezone;
+    viaProxy.value = !!proxyUrl;
   } catch {
     fetchFailed.value = true;
     ip.value = t("home.ipInfo.fetchFailed");
@@ -54,6 +58,7 @@ onMounted(fetchIp);
         <div class="ip-country">
           <span class="country-flag">🌍</span>
           <span class="country-name">{{ country || '-' }}</span>
+          <span v-if="viaProxy" class="proxy-badge">{{ t('home.ipInfo.viaProxy') }}</span>
         </div>
         <div class="ip-row">
           <span class="ip-label">IP:</span>
@@ -97,6 +102,7 @@ onMounted(fetchIp);
 .ip-country { display: flex; align-items: center; gap: 8px; }
 .country-flag { font-size: 24px; flex-shrink: 0; }
 .country-name { font-size: 16px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proxy-badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(79, 142, 247, 0.12); color: var(--accent); font-weight: 500; flex-shrink: 0; }
 .ip-row { display: flex; align-items: flex-start; gap: 6px; font-size: 13px; }
 .ip-label { color: var(--text-secondary); white-space: nowrap; flex-shrink: 0; }
 .ip-value { font-weight: 500; word-break: break-all; overflow-wrap: break-word; min-width: 0; }

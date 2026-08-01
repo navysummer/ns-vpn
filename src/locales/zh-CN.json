@@ -34,7 +34,9 @@
     "settings": "设置"
   },
   "sidebar": {
-    "memory": "内存"
+    "memory": "内存",
+    "running": "运行中",
+    "stopped": "已停止"
   },
   "dashboard": {
     "title": "首页",

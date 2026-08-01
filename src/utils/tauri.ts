@@ -125,7 +125,7 @@ export interface IpInfo {
   timezone: string;
 }
 
-export const fetchIpInfo = () => tauriInvoke<IpInfo>("fetch_ip_info");
+export const fetchIpInfo = (proxyUrl?: string) => tauriInvoke<IpInfo>("fetch_ip_info", proxyUrl ? { proxy_url: proxyUrl } : undefined);
 
 // ---- Traffic ----
 export interface TrafficData {
