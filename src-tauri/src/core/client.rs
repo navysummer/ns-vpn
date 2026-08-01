@@ -59,29 +59,36 @@ impl MihomoClient {
 
     pub async fn get_traffic(&self) -> Result<Vec<TrafficEntry>, String> {
         let url = format!("{}/traffic", self.base_url);
-        let resp = self.client.get(&url)
+        let mut resp = self.client.get(&url)
             .send()
             .await
             .map_err(|e| format!("Request failed: {}", e))?;
         if !resp.status().is_success() {
             return Err(format!("Traffic API error: HTTP {}", resp.status()));
         }
-        let mut lines = resp.bytes_stream();
-        use futures_util::StreamExt;
         let mut buf: Vec<u8> = Vec::new();
         let mut entries = Vec::new();
-        'read_line: while let Some(chunk) = lines.next().await {
-            let chunk = chunk.map_err(|e| format!("Stream error: {}", e))?;
-            buf.extend_from_slice(&chunk);
-            if let Some(pos) = buf.iter().position(|&b| b == b'\n') {
-                let line = &buf[..pos];
-                if let Ok(entry) = serde_json::from_slice::<TrafficEntry>(line) {
-                    entries.push(entry);
-                    break 'read_line;
+        loop {
+            let chunk = tokio::time::timeout(
+                std::time::Duration::from_secs(3),
+                resp.chunk(),
+            ).await.map_err(|_| "traffic timeout".to_string())?
+                .map_err(|e| format!("chunk error: {}", e))?;
+            match chunk {
+                Some(bytes) => {
+                    buf.extend_from_slice(&bytes);
+                    if let Some(pos) = buf.iter().position(|&b| b == b'\n') {
+                        let line = &buf[..pos];
+                        if let Ok(entry) = serde_json::from_slice::<TrafficEntry>(line) {
+                            entries.push(entry);
+                            break;
+                        }
+                    }
+                    if buf.len() > 4096 {
+                        break;
+                    }
                 }
-            }
-            if buf.len() > 4096 {
-                break;
+                None => break,
             }
         }
         Ok(entries)

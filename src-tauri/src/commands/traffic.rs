@@ -13,37 +13,52 @@ pub struct TrafficData {
 
 #[tauri::command]
 pub async fn get_traffic(state: State<'_, AppState>) -> Result<TrafficData, String> {
+    let up_speed: u64;
+    let down_speed: u64;
+    let up_total: u64;
+    let down_total: u64;
+    let active_connections: u64;
+
     if let Some(client) = state.core_manager.client() {
-        match client.get_traffic().await {
-            Ok(entries) => {
-                let mut up_speed: u64 = 0;
-                let mut down_speed: u64 = 0;
-                for entry in &entries {
-                    up_speed += entry.up;
-                    down_speed += entry.down;
-                }
-                // Also get connection count for totals
-                let conns = client.get_connections().await.ok();
-                let (up_total, down_total, active) = match conns {
-                    Some(c) => (c.upload_total, c.download_total, c.connections.len() as u64),
-                    None => (0, 0, 0),
-                };
-                return Ok(TrafficData {
-                    upload_speed: up_speed,
-                    download_speed: down_speed,
-                    upload_total: up_total,
-                    download_total: down_total,
-                    active_connections: active,
-                });
+        let traffic = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            client.get_traffic(),
+        ).await;
+        let (speed_up, speed_down) = match traffic {
+            Ok(Ok(entries)) => {
+                (entries.iter().map(|e| e.up).sum(), entries.iter().map(|e| e.down).sum())
             }
-            Err(_) => {}
+            _ => (0, 0),
+        };
+        up_speed = speed_up;
+        down_speed = speed_down;
+
+        let conns = client.get_connections().await.ok();
+        match conns {
+            Some(c) => {
+                up_total = c.upload_total;
+                down_total = c.download_total;
+                active_connections = c.connections.len() as u64;
+            }
+            None => {
+                up_total = 0;
+                down_total = 0;
+                active_connections = 0;
+            }
         }
+    } else {
+        up_speed = 0;
+        down_speed = 0;
+        up_total = 0;
+        down_total = 0;
+        active_connections = 0;
     }
+
     Ok(TrafficData {
-        upload_speed: 0,
-        download_speed: 0,
-        upload_total: 0,
-        download_total: 0,
-        active_connections: 0,
+        upload_speed: up_speed,
+        download_speed: down_speed,
+        upload_total: up_total,
+        download_total: down_total,
+        active_connections,
     })
 }

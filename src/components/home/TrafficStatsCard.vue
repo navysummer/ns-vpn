@@ -20,7 +20,8 @@ const maxHistory = 60;
 
 let interval: ReturnType<typeof setInterval> | null = null;
 
-function updateTraffic() {
+async function updateTraffic() {
+  await app.fetchTraffic();
   uploadSpeed.value = app.traffic.upload_speed;
   downloadSpeed.value = app.traffic.download_speed;
   uploadTotal.value = app.traffic.upload_total;

@@ -271,6 +271,7 @@ const activeSubUpdateTime = ref<string>("");
       await fetchProxies();
       await fetchRules();
       await fetchConnections();
+      await fetchTraffic();
     } catch {}
   }
 

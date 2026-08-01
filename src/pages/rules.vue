@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import { Search } from "lucide-vue-next";
 import { useAppStore } from "@/stores/app";
@@ -9,9 +9,14 @@ import EmptyState from "@/components/EmptyState.vue";
 const app = useAppStore();
 const { t } = useI18n();
 
-onMounted(() => {
+const loading = ref(false);
+
+onMounted(async () => {
   if (app.proxyRunning) {
-    app.fetchRules();
+    loading.value = true;
+    await nextTick();
+    await app.fetchRules();
+    loading.value = false;
   }
 });
 
@@ -110,14 +115,24 @@ function typeBg(type: string): string {
             <div>{{ t('rules.proxy') }}</div>
           </div>
           <div class="rules-scroll">
-            <div v-for="(rule, i) in filteredRules" :key="i" class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center row-hover" :style="{ borderColor: 'var(--border)' }">
-              <div><span class="tag" :style="{ backgroundColor: typeBg(rule.type), color: typeColor(rule.type) }">{{ rule.type }}</span></div>
-              <div class="font-mono text-xs truncate" :style="{ color: 'var(--text-primary)' }">{{ rule.payload }}</div>
-              <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ rule.behavior }}</div>
-              <div><span class="tag" :style="{ backgroundColor: proxyBg(rule.proxy), color: proxyColor(rule.proxy) }">{{ rule.proxy }}</span></div>
-            </div>
+            <template v-if="loading">
+              <div v-for="i in 10" :key="'skeleton-' + i" class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center" :style="{ borderColor: 'var(--border)' }">
+                <div><span class="skeleton skeleton-tag">&nbsp;</span></div>
+                <div><span class="skeleton skeleton-text w-48">&nbsp;</span></div>
+                <div><span class="skeleton skeleton-text w-20">&nbsp;</span></div>
+                <div><span class="skeleton skeleton-tag-proxy">&nbsp;</span></div>
+              </div>
+            </template>
+            <TransitionGroup v-else name="rule-list" tag="div">
+              <div v-for="(rule, i) in filteredRules" :key="i" class="grid grid-cols-4 gap-2 px-4 py-2.5 text-sm items-center row-hover" :style="{ borderColor: 'var(--border)' }">
+                <div><span class="tag" :style="{ backgroundColor: typeBg(rule.type), color: typeColor(rule.type) }">{{ rule.type }}</span></div>
+                <div class="font-mono text-xs truncate" :style="{ color: 'var(--text-primary)' }">{{ rule.payload }}</div>
+                <div class="text-xs" :style="{ color: 'var(--text-secondary)' }">{{ rule.behavior }}</div>
+                <div><span class="tag" :style="{ backgroundColor: proxyBg(rule.proxy), color: proxyColor(rule.proxy) }">{{ rule.proxy }}</span></div>
+              </div>
+            </TransitionGroup>
           </div>
-          <EmptyState v-if="filteredRules.length === 0" :title="t('rules.noMatchingRules')" />
+          <EmptyState v-if="!loading && filteredRules.length === 0" :title="t('rules.noMatchingRules')" />
         </div>
       </div>
     </div>
@@ -129,6 +144,37 @@ function typeBg(type: string): string {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+
+/* ── Skeleton loader ── */
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.55; }
+}
+.skeleton {
+  display: inline-block;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  animation: pulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+.skeleton-text { height: 14px; vertical-align: middle; }
+.skeleton-tag { width: 48px; height: 18px; border-radius: 4px; }
+.skeleton-tag-proxy { width: 52px; height: 18px; border-radius: 4px; }
+.w-20 { width: 80px; }
+.w-48 { width: 192px; }
+
+/* ── TransitionGroup animations ── */
+.rule-list-enter-active {
+  transition: all 0.15s ease;
+}
+.rule-list-enter-from {
+  opacity: 0;
+  transform: translateY(4px);
+}
+.rule-list-move {
+  transition: transform 0.15s ease;
 }
 
 .providers-panel {

@@ -9,9 +9,13 @@ const app = useAppStore();
 const { show } = useToast();
 const { t } = useI18n();
 
-onMounted(() => {
+const loading = ref(false);
+
+onMounted(async () => {
   if (app.proxyRunning) {
-    app.fetchProxies();
+    loading.value = true;
+    await app.fetchProxies();
+    loading.value = false;
   }
 });
 
@@ -174,12 +178,30 @@ function nodeTypeIcon(type: string): string {
         <p>{{ app.proxyRunning ? t('proxies.noGroupsDesc') : t('proxies.coreNotRunning') }}</p>
       </div>
 
+      <div v-else-if="loading" class="nodes-container">
+        <div class="nodes-header">
+          <span class="nodes-title skeleton skeleton-text w-40">&nbsp;</span>
+        </div>
+        <div class="nodes-grid">
+          <div v-for="i in 8" :key="'skeleton-' + i" class="node-card">
+            <div class="node-top">
+              <span class="skeleton skeleton-badge">&nbsp;</span>
+              <span class="skeleton skeleton-text w-32">&nbsp;</span>
+              <span class="skeleton skeleton-tag">&nbsp;</span>
+            </div>
+            <div class="node-bottom">
+              <span class="skeleton skeleton-text w-16">&nbsp;</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div v-else-if="filteredGroups.length > 0" class="nodes-container">
         <div class="nodes-header">
           <span class="nodes-title">{{ currentGroup?.name }}</span>
           <span v-if="!app.proxyRunning" class="offline-badge">{{ t('proxies.offline') }}</span>
         </div>
-        <div class="nodes-grid">
+        <TransitionGroup name="node-list" tag="div" class="nodes-grid">
           <div v-for="node in currentNodes" :key="node.name"
             class="node-card">
             <div class="node-top">
@@ -209,7 +231,7 @@ function nodeTypeIcon(type: string): string {
               </button>
             </div>
           </div>
-        </div>
+        </TransitionGroup>
       </div>
     </template>
   </div>
@@ -363,6 +385,43 @@ function nodeTypeIcon(type: string): string {
 
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* ── Skeleton loader ── */
+@keyframes pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.55; }
+}
+.skeleton {
+  display: inline-block;
+  border-radius: 6px;
+  background: var(--bg-tertiary);
+  animation: pulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+.skeleton-text { height: 14px; vertical-align: middle; }
+.skeleton-badge { width: 24px; height: 24px; border-radius: 6px; }
+.skeleton-tag { width: 48px; height: 18px; border-radius: 4px; }
+.w-32 { width: 128px; }
+.w-40 { width: 160px; }
+.w-16 { width: 64px; }
+
+/* ── TransitionGroup node animations ── */
+.node-list-enter-active {
+  transition: all 0.15s ease;
+}
+.node-list-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.node-list-move {
+  transition: transform 0.15s ease;
+}
+
+/* ── Fade between skeleton & real data ── */
+.nodes-container {
+  transition: opacity 0.15s ease;
+}
 
 @media (max-width: 768px) {
   .nodes-grid { grid-template-columns: 1fr; }

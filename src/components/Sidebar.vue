@@ -32,7 +32,27 @@ const isActive = (path: string) => route.path === path;
   <aside class="sidebar-container">
     <div class="sidebar-header">
       <div class="flex items-center gap-3 overflow-hidden">
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" style="color: var(--text-primary)"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 512 512" class="shrink-0">
+          <defs>
+            <linearGradient id="sideIcon" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#4a90d9"/>
+              <stop offset="100%" stop-color="#2a6cb8"/>
+            </linearGradient>
+            <linearGradient id="sideAccent" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#00d4ff"/>
+              <stop offset="100%" stop-color="#0099cc"/>
+            </linearGradient>
+          </defs>
+          <path d="M256 80 L408 142 L408 262 C408 344 344 406 256 436 C168 406 104 344 104 262 L104 142 Z" fill="url(#sideIcon)" stroke="url(#sideAccent)" stroke-width="14"/>
+          <circle cx="256" cy="240" r="44" fill="url(#sideAccent)"/>
+          <circle cx="256" cy="148" r="20" fill="#00d4ff" opacity="0.85"/>
+          <circle cx="184" cy="300" r="20" fill="#00d4ff" opacity="0.85"/>
+          <circle cx="328" cy="300" r="20" fill="#00d4ff" opacity="0.85"/>
+          <line x1="236" y1="220" x2="210" y2="170" stroke="#00d4ff" stroke-width="6" opacity="0.6" stroke-linecap="round"/>
+          <line x1="276" y1="220" x2="302" y2="170" stroke="#00d4ff" stroke-width="6" opacity="0.6" stroke-linecap="round"/>
+          <line x1="236" y1="260" x2="196" y2="292" stroke="#00d4ff" stroke-width="6" opacity="0.6" stroke-linecap="round"/>
+          <line x1="276" y1="260" x2="316" y2="292" stroke="#00d4ff" stroke-width="6" opacity="0.6" stroke-linecap="round"/>
+        </svg>
         <span class="text-base font-semibold whitespace-nowrap">NS VPN</span>
       </div>
     </div>
