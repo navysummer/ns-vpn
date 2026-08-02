@@ -98,9 +98,13 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build Tauri app (signed)
-        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
-        run: pnpm tauri build --target ${{ matrix.target }} --bundles dmg
+      - name: Build Tauri app
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            unset APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \
+              APPLE_TEAM_ID APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_KEYCHAIN
+          fi
+          pnpm tauri build --target ${{ matrix.target }} --bundles dmg
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -109,10 +113,6 @@ jobs:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           APPLE_KEYCHAIN: ${{ secrets.APPLE_KEYCHAIN }}
-
-      - name: Build Tauri app (unsigned)
-        if: ${{ secrets.APPLE_CERTIFICATE == '' }}
-        run: pnpm tauri build --target ${{ matrix.target }} --bundles dmg
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -157,9 +157,13 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build universal binary (signed)
-        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
-        run: pnpm tauri build --target universal-apple-darwin --bundles dmg
+      - name: Build universal binary
+        run: |
+          if [ -z "$APPLE_CERTIFICATE" ]; then
+            unset APPLE_SIGNING_IDENTITY APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD \
+              APPLE_TEAM_ID APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_KEYCHAIN
+          fi
+          pnpm tauri build --target universal-apple-darwin --bundles dmg
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -167,10 +171,6 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-
-      - name: Build universal binary (unsigned)
-        if: ${{ secrets.APPLE_CERTIFICATE == '' }}
-        run: pnpm tauri build --target universal-apple-darwin --bundles dmg
 
       - name: Upload universal artifacts
         uses: actions/upload-artifact@v4
