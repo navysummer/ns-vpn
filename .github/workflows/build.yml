@@ -19,6 +19,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   PNPM_VERSION: '9'
+  NODE_VERSION: '22'
 
 jobs:
   # ─────────────────────────────────────────────
@@ -62,7 +63,7 @@ jobs:
       matrix:
         include:
           - arch: x86_64
-            runner: macos-13
+            runner: macos-15-intel
             target: x86_64-apple-darwin
           - arch: arm64
             runner: macos-14
@@ -98,7 +99,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri app
-        run: pnpm tauri build --target ${{ matrix.target }} --bundles dmg,zip
+        run: pnpm tauri build --target ${{ matrix.target }} --bundles dmg
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -152,7 +153,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build universal binary
-        run: pnpm tauri build --target universal-apple-darwin --bundles dmg,zip
+        run: pnpm tauri build --target universal-apple-darwin --bundles dmg
         env:
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -288,12 +289,12 @@ jobs:
           retention-days: 7
 
   # ─────────────────────────────────────────────
-  #  iOS (arm64)
+  #  iOS build
   # ─────────────────────────────────────────────
   ios:
-    name: iOS (arm64)
+    name: iOS IPA
     needs: frontend
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -303,62 +304,41 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist/
-
-      - name: Setup Rust
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-ios
 
-      - name: Install iOS deps
-        run: |
-          brew install librsvg
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
-      - name: Install frontend deps
+      - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Add iOS platform
-        run: pnpm tauri ios init
-
       - name: Build iOS
-        run: pnpm tauri ios build --target aarch64-apple-ios --bundles ipa
-        env:
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_KEYCHAIN: ${{ secrets.APPLE_KEYCHAIN }}
-          PROVISIONING_PROFILE: ${{ secrets.IOS_PROVISIONING_PROFILE }}
+        run: |
+          pnpm tauri ios init
+          pnpm tauri ios build --no-sign
 
-      - name: Upload iOS artifacts
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: ns-vpn-ios-arm64
-          path: src-tauri/target/aarch64-apple-ios/release/bundle/
+          name: iOS
+          path: src-tauri/gen/ios/build/
           retention-days: 7
 
   # ─────────────────────────────────────────────
-  #  Android (arm64 + x86_64)
+  #  Android build
   # ─────────────────────────────────────────────
   android:
-    name: Android (${{ matrix.arch }})
+    name: Android APK
     needs: frontend
-    runs-on: ubuntu-22.04
-    strategy:
-      matrix:
-        include:
-          - arch: arm64
-            target: aarch64-linux-android
-          - arch: x86_64
-            target: x86_64-linux-android
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
@@ -368,58 +348,48 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: dist/
-
-      - name: Setup Rust
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: aarch64-linux-android
 
-      - name: Setup Java
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -yqq \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+      - name: Install Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          distribution: "temurin"
+          java-version: "17"
 
-      - name: Setup Android SDK
+      - name: Install Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install system deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libgtk-3-dev \
-            libsoup-3.0-dev \
-            libjavascriptcoregtk-4.1-dev \
-            librsvg2-dev
-
-      - name: Install frontend deps
+      - name: Install JS dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Add Android platform
-        run: pnpm tauri android init
-
       - name: Build Android APK
-        run: pnpm tauri android build --target ${{ matrix.target }} --bundles apk
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          NDK_HOME: ${{ env.NDK_HOME }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          pnpm tauri android init
+          pnpm tauri android build --apk
 
-      - name: Upload Android artifacts
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: ns-vpn-android-${{ matrix.arch }}
-          path: src-tauri/gen/android/app/build/outputs/
+          name: Android
+          path: src-tauri/gen/android/app/build/outputs/apk/**
           retention-days: 7
 
   # ─────────────────────────────────────────────
