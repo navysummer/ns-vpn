@@ -77,6 +77,11 @@ pub fn set_system_proxy(host: &str, port: u16) -> Result<(), String> {
             .map_err(|e| format!("Failed to set HTTPS proxy port: {}", e))?;
     }
 
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        let _ = (host, port);
+    }
+
     Ok(())
 }
 

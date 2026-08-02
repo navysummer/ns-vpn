@@ -114,15 +114,21 @@ pub fn run() {
         core_manager: CoreManager::new(),
     };
 
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_autostart::init(
+        .plugin(tauri_plugin_process::init());
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--flag1"]),
-        ))
+        ));
+    }
+
+    builder
         .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             commands::config::get_config,
