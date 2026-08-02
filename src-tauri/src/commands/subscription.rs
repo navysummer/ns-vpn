@@ -825,7 +825,6 @@ fn parse_v2rayn_line(line: &str) -> Result<Option<serde_json::Value>, String> {
             if hp.len() < 2 { return Ok(None); }
             let server = hp[1].trim_start_matches('[').trim_end_matches(']');
             let port = hp[0].parse::<u16>().unwrap_or(22);
-            let default_name = format!("ssh-{}:{}", server, port);
             let name = format!("ssh-{}:{}", server, port);
             Ok(Some(serde_json::json!({
                 "name": name,
