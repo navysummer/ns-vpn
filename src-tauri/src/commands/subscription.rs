@@ -153,7 +153,7 @@ fn convert_v2rayn_to_clash(content: &str) -> Result<String, String> {
     if looks_like_clash_yaml(text) {
         return Ok(text.to_string());
     }
-    let decoded = if text.lines().all(|l| l.trim().is_empty() || l.starts_with("ss://") || l.starts_with("vmess://") || l.starts_with("trojan://") || l.starts_with("vless://") || l.starts_with("hysteria2://") || l.starts_with("snell://") || l.starts_with("anytls://")) {
+    let decoded = if text.lines().all(|l| l.trim().is_empty() || l.starts_with("ss://") || l.starts_with("vmess://") || l.starts_with("trojan://") || l.starts_with("vless://") || l.starts_with("hysteria2://") || l.starts_with("hysteria://") || l.starts_with("snell://") || l.starts_with("anytls://") || l.starts_with("ssr://") || l.starts_with("tuic://") || l.starts_with("ssh://") || l.starts_with("naive+https://") || l.starts_with("wireguard://") || l.starts_with("wg://")) {
         text.to_string()
     } else {
         base64_decode(text)?
@@ -702,6 +702,169 @@ fn parse_v2rayn_line(line: &str) -> Result<Option<serde_json::Value>, String> {
             }
 
             Ok(Some(node))
+        }
+        "ssr" => {
+            let decoded = base64_decode(rest)?;
+            let parts: Vec<&str> = decoded.splitn(6, ":").collect();
+            if parts.len() < 6 {
+                return Ok(None);
+            }
+            let server = parts[0];
+            let port = parts[1].parse::<u16>().unwrap_or(443);
+            let protocol = parts[2];
+            let method = parts[3];
+            let obfs = parts[4];
+            let rest2 = parts[5];
+            let at_idx = rest2.rfind('/').unwrap_or(rest2.len());
+            let password = urldecode(&rest2[..at_idx])?;
+            let params_str = if at_idx < rest2.len() { &rest2[at_idx..] } else { "" };
+            let params = parse_query_params(params_str);
+
+            let default_name = format!("ssr-{}:{}", server, port);
+            let name = params.get("remarks").map(|s| s.as_str()).unwrap_or(&default_name);
+
+            let mut node = serde_json::json!({
+                "name": name,
+                "type": "ss",
+                "server": server,
+                "port": port,
+                "cipher": method,
+                "password": password,
+            });
+            if !protocol.is_empty() {
+                node["ssr-protocol"] = serde_json::json!(protocol);
+            }
+            if !obfs.is_empty() {
+                node["ssr-obfs"] = serde_json::json!(obfs);
+            }
+            Ok(Some(node))
+        }
+        "hysteria" => {
+            let at_idx = rest.find("@").ok_or("Invalid hysteria URI")?;
+            let auth = urldecode(&rest[..at_idx])?;
+            let server_part = &rest[at_idx + 1..];
+
+            let semi_idx = server_part.find(';').or_else(|| server_part.find('?'));
+            let server_port = if let Some(idx) = semi_idx {
+                &server_part[..idx]
+            } else {
+                server_part
+            };
+            let sp: Vec<&str> = server_port.rsplitn(2, ":").collect();
+            if sp.len() < 2 {
+                return Ok(None);
+            }
+            let server = sp[1].trim_start_matches('[').trim_end_matches(']');
+            let port = sp[0].parse::<u16>().unwrap_or(443);
+
+            let params_str = if let Some(idx) = semi_idx {
+                &server_part[idx + 1..]
+            } else {
+                ""
+            };
+            let params = parse_query_params(params_str.split('#').next().unwrap_or(params_str));
+
+            let protocol = params.get("protocol").map(|s| s.as_str()).unwrap_or("udp");
+            let up_mbps = params.get("up").and_then(|s| s.parse::<u64>().ok()).unwrap_or(10);
+            let down_mbps = params.get("down").and_then(|s| s.parse::<u64>().ok()).unwrap_or(50);
+            let insecure = params.get("insecure").map(|s| s.as_str()).unwrap_or("0") == "1";
+
+            let default_name = format!("hysteria-{}:{}", server, port);
+            let name = params.get("remarks").map(|s| s.as_str()).unwrap_or(&default_name);
+
+            Ok(Some(serde_json::json!({
+                "name": name,
+                "type": "hysteria2",
+                "server": server,
+                "port": port,
+                "password": auth,
+                "protocol": protocol,
+                "up": format!("{} Mbps", up_mbps),
+                "down": format!("{} Mbps", down_mbps),
+                "skip-cert-verify": insecure,
+            })))
+        }
+        "tuic" => {
+            let at_idx = rest.find("@").ok_or("Invalid tuic URI")?;
+            let userinfo = &rest[..at_idx];
+            let server_part = &rest[at_idx + 1..];
+            let hp: Vec<&str> = server_part.split(['?', ';', '#']).next().unwrap_or(server_part).rsplitn(2, ":").collect();
+            if hp.len() < 2 { return Ok(None); }
+            let server = hp[1].trim_start_matches('[').trim_end_matches(']');
+            let port = hp[0].parse::<u16>().unwrap_or(443);
+
+            let semi_idx = server_part.find('?').or_else(|| server_part.find(';'));
+            let params_str = semi_idx.map(|i| &server_part[i + 1..]).unwrap_or("");
+            let params = parse_query_params(params_str.split('#').next().unwrap_or(params_str));
+
+            let uuid_pass: Vec<&str> = userinfo.splitn(2, ":").collect();
+            let uuid = uuid_pass[0];
+            let password = uuid_pass.get(1).unwrap_or(&"");
+
+            let default_name = format!("tuic-{}:{}", server, port);
+            let name = params.get("remarks").map(|s| s.as_str()).unwrap_or(&default_name);
+
+            let mut node = serde_json::json!({
+                "name": name,
+                "type": "direct",
+                "server": server,
+                "port": port,
+                "tuic-uuid": uuid,
+                "tuic-password": password,
+            });
+            if let Some(cc) = params.get("congestion_control") {
+                node["tuic-congestion-control"] = serde_json::json!(cc);
+            }
+            Ok(Some(node))
+        }
+        "ssh" => {
+            let at_idx = rest.find("@").ok_or("Invalid ssh URI")?;
+            let user = urldecode(&rest[..at_idx])?;
+            let server_part = &rest[at_idx + 1..];
+            let hp: Vec<&str> = server_part.rsplitn(2, ":").collect();
+            if hp.len() < 2 { return Ok(None); }
+            let server = hp[1].trim_start_matches('[').trim_end_matches(']');
+            let port = hp[0].parse::<u16>().unwrap_or(22);
+            let default_name = format!("ssh-{}:{}", server, port);
+            let name = format!("ssh-{}:{}", server, port);
+            Ok(Some(serde_json::json!({
+                "name": name,
+                "type": "direct",
+                "server": server,
+                "port": port,
+                "ssh-user": user,
+            })))
+        }
+        "naive+https" => {
+            let user_pass = &rest[..rest.find('@').unwrap_or(0)];
+            let server_part = &rest[rest.find('@').map(|i| i + 1).unwrap_or(0)..];
+            let hp: Vec<&str> = server_part.rsplitn(2, ":").collect();
+            let server = hp.last().map(|s| s.trim_start_matches('[').trim_end_matches(']')).unwrap_or(server_part);
+            let port = hp.get(0).and_then(|s| s.parse::<u16>().ok()).unwrap_or(443);
+            let default_name = format!("naive-{}:{}", server, port);
+            let name = default_name.clone();
+            Ok(Some(serde_json::json!({
+                "name": name,
+                "type": "direct",
+                "server": server,
+                "port": port,
+                "naive-user": user_pass,
+            })))
+        }
+        "wireguard" | "wg" => {
+            let hp: Vec<&str> = rest.rsplitn(2, ":").collect();
+            if hp.len() < 2 { return Ok(None); }
+            let server = hp[1].trim_start_matches('[').trim_end_matches(']');
+            let port = hp[0].parse::<u16>().unwrap_or(51820);
+            let default_name = format!("wg-{}:{}", server, port);
+            let name = default_name.clone();
+            Ok(Some(serde_json::json!({
+                "name": name,
+                "type": "direct",
+                "server": server,
+                "port": port,
+                "wireguard": true,
+            })))
         }
         _ => Ok(None),
     }

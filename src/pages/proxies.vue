@@ -106,9 +106,14 @@ function nodeTypeIcon(type: string): string {
     case "Vless": case "Vmess": case "vless": case "vmess": return "V";
     case "Trojan": case "trojan": return "T";
     case "Shadowsocks": case "ss": case "shadowsocks": return "S";
+    case "ShadowsocksR": case "ssr": case "shadowsocksr": return "SR";
     case "Hysteria": case "Hysteria2": case "hysteria": case "hysteria2": return "H";
     case "Snell": case "snell": return "Sn";
     case "AnyTLS": case "anytls": return "A";
+    case "TUIC": case "tuic": return "TUIC";
+    case "SSH": case "ssh": return "SSH";
+    case "Naive": case "naive": return "N";
+    case "WireGuard": case "wireguard": case "wg": return "WG";
     case "Direct": case "direct": return "D";
     case "Reject": case "reject": return "R";
     case "URLTest": case "urltest": return "U";
@@ -348,9 +353,14 @@ function nodeTypeIcon(type: string): string {
 .type-vless, .type-vmess { background: rgba(79, 142, 247, 0.12); color: var(--accent); }
 .type-trojan { background: rgba(255, 69, 58, 0.12); color: var(--red); }
 .type-shadowsocks, .type-ss { background: rgba(52, 199, 89, 0.12); color: var(--green); }
+.type-shadowsocksr, .type-ssr { background: rgba(52, 199, 89, 0.12); color: var(--green); }
 .type-hysteria, .type-hysteria2 { background: rgba(255, 159, 10, 0.12); color: var(--orange); }
 .type-snell { background: rgba(191, 90, 242, 0.12); color: #bf5af2; }
 .type-anytls { background: rgba(79, 142, 247, 0.12); color: var(--accent); }
+.type-tuic { background: rgba(79, 142, 247, 0.12); color: var(--accent); }
+.type-ssh { background: rgba(79, 142, 247, 0.12); color: var(--accent); }
+.type-naive { background: rgba(255, 159, 10, 0.12); color: var(--orange); }
+.type-wireguard, .type-wg { background: rgba(52, 199, 89, 0.12); color: var(--green); }
 .type-direct { background: rgba(52, 199, 89, 0.12); color: var(--green); }
 .type-reject { background: rgba(255, 69, 58, 0.12); color: var(--red); }
 
