@@ -1,4 +1,5 @@
 use serde::Serialize;
+use std::sync::Mutex;
 use tauri::State;
 use crate::AppState;
 
@@ -11,54 +12,50 @@ pub struct TrafficData {
     pub active_connections: u64,
 }
 
+static LAST_TOTALS: Mutex<Option<(u64, u64, std::time::Instant)>> = Mutex::new(None);
+
 #[tauri::command]
 pub async fn get_traffic(state: State<'_, AppState>) -> Result<TrafficData, String> {
-    let up_speed: u64;
-    let down_speed: u64;
-    let up_total: u64;
-    let down_total: u64;
-    let active_connections: u64;
-
     if let Some(client) = state.core_manager.client() {
-        let traffic = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            client.get_traffic(),
-        ).await;
-        let (speed_up, speed_down) = match traffic {
-            Ok(Ok(entries)) => {
-                (entries.iter().map(|e| e.up).sum(), entries.iter().map(|e| e.down).sum())
+        let conns = client.get_connections().await.map_err(|e| e.to_string())?;
+        let up_total = conns.upload_total;
+        let down_total = conns.download_total;
+        let active = conns.connections.len() as u64;
+
+        let (up_speed, down_speed) = {
+            let mut lock = LAST_TOTALS.lock().unwrap();
+            if let Some((prev_up, prev_down, instant)) = *lock {
+                let elapsed = instant.elapsed().as_secs_f64();
+                if elapsed > 0.0 {
+                    let speed_up = ((up_total.saturating_sub(prev_up)) as f64 / elapsed) as u64;
+                    let speed_down = ((down_total.saturating_sub(prev_down)) as f64 / elapsed) as u64;
+                    *lock = Some((up_total, down_total, std::time::Instant::now()));
+                    (speed_up, speed_down)
+                } else {
+                    *lock = Some((up_total, down_total, std::time::Instant::now()));
+                    (0, 0)
+                }
+            } else {
+                *lock = Some((up_total, down_total, std::time::Instant::now()));
+                (0, 0)
             }
-            _ => (0, 0),
         };
-        up_speed = speed_up;
-        down_speed = speed_down;
 
-        let conns = client.get_connections().await.ok();
-        match conns {
-            Some(c) => {
-                up_total = c.upload_total;
-                down_total = c.download_total;
-                active_connections = c.connections.len() as u64;
-            }
-            None => {
-                up_total = 0;
-                down_total = 0;
-                active_connections = 0;
-            }
-        }
+        Ok(TrafficData {
+            upload_speed: up_speed,
+            download_speed: down_speed,
+            upload_total: up_total,
+            download_total: down_total,
+            active_connections: active,
+        })
     } else {
-        up_speed = 0;
-        down_speed = 0;
-        up_total = 0;
-        down_total = 0;
-        active_connections = 0;
+        *LAST_TOTALS.lock().unwrap() = None;
+        Ok(TrafficData {
+            upload_speed: 0,
+            download_speed: 0,
+            upload_total: 0,
+            download_total: 0,
+            active_connections: 0,
+        })
     }
-
-    Ok(TrafficData {
-        upload_speed: up_speed,
-        download_speed: down_speed,
-        upload_total: up_total,
-        download_total: down_total,
-        active_connections,
-    })
 }

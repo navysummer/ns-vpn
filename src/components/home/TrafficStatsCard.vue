@@ -21,7 +21,18 @@ const maxHistory = 60;
 let interval: ReturnType<typeof setInterval> | null = null;
 
 async function updateTraffic() {
-  await app.fetchTraffic();
+  if (!app.proxyRunning) {
+    uploadSpeed.value = 0;
+    downloadSpeed.value = 0;
+    uploadTotal.value = 0;
+    downloadTotal.value = 0;
+    activeConnections.value = 0;
+    speedHistory.value = [];
+    return;
+  }
+  try {
+    await app.fetchTraffic();
+  } catch {}
   uploadSpeed.value = app.traffic.upload_speed;
   downloadSpeed.value = app.traffic.download_speed;
   uploadTotal.value = app.traffic.upload_total;

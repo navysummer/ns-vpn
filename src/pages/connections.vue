@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { X, Search, ChevronRight, List, LayoutGrid, Activity, Settings2, PieChart } from "lucide-vue-next";
 import { formatBytes, formatRelativeTime, formatAlive } from "@/utils/format";
@@ -9,6 +9,23 @@ import EmptyState from "@/components/EmptyState.vue";
 
 const app = useAppStore();
 const { t } = useI18n();
+
+let connInterval: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  if (app.proxyRunning) {
+    app.fetchConnections();
+  }
+  connInterval = setInterval(() => {
+    if (app.proxyRunning) {
+      app.fetchConnections();
+    }
+  }, 2000);
+});
+
+onUnmounted(() => {
+  if (connInterval) clearInterval(connInterval);
+});
 
 interface Connection {
   id: string;

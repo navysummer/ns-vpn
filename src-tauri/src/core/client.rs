@@ -42,7 +42,32 @@ impl MihomoClient {
     }
 
     pub async fn get_connections(&self) -> Result<ConnectionsResponse, String> {
-        self.get("/connections").await
+        let url = format!("{}/connections?interval=1000", self.base_url);
+        let mut resp = self.client.get(&url)
+            .send()
+            .await
+            .map_err(|e| format!("Request failed: {}", e))?;
+        if !resp.status().is_success() {
+            return Err(format!("Connections API error: HTTP {}", resp.status()));
+        }
+        let mut buf: Vec<u8> = Vec::new();
+        loop {
+            let chunk = tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                resp.chunk(),
+            ).await.map_err(|_| "connections timeout".to_string())?
+                .map_err(|e| format!("chunk error: {}", e))?;
+            match chunk {
+                Some(bytes) => {
+                    buf.extend_from_slice(&bytes);
+                    if let Ok(conns) = serde_json::from_slice::<ConnectionsResponse>(&buf) {
+                        return Ok(conns);
+                    }
+                }
+                None => break,
+            }
+        }
+        Err("connections: no valid JSON response".to_string())
     }
 
     pub async fn close_connection(&self, id: &str) -> Result<(), String> {
