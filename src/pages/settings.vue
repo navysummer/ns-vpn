@@ -5,6 +5,11 @@ import { useAppStore } from "@/stores/app";
 import { useToast } from "@/utils/toast";
 import { useI18n } from "vue-i18n";
 import { enable as autostartEnable, disable as autostartDisable } from "@tauri-apps/plugin-autostart";
+import { getCoreVersion, openAppDir, getConfigFileInfo, getLogDir, exportDiagnostics as tauriExportDiagnostics, type ConfigFileInfo } from "@/utils/tauri";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { open } from "@tauri-apps/plugin-shell";
+import { save, open as dialogOpen } from "@tauri-apps/plugin-dialog";
+import { writeTextFile, readTextFile } from "@tauri-apps/plugin-fs";
 
 const app = useAppStore();
 const { show } = useToast();
@@ -13,6 +18,12 @@ const { t } = useI18n();
 const saving = ref(false);
 const lastCheckUpdate = ref(new Date().toLocaleString("zh-CN", { hour12: false }));
 const activePanel = ref<string | null>(null);
+const coreVersion = ref("");
+const configFileInfo = ref<ConfigFileInfo | null>(null);
+const systemInfo = ref<{ version: string; os: string; arch: string; core_version: string | null } | null>(null);
+const isCheckingUpdate = ref(false);
+const isExporting = ref(false);
+const startupScriptName = ref("");
 
 watch(() => app.startAtBoot, async (val) => {
   try {
@@ -39,6 +50,10 @@ function openWebInterface() {
 }
 function openCoreInfo() {
   openPanel("coreInfo");
+  coreVersion.value = "";
+  configFileInfo.value = null;
+  getCoreVersion().then(v => coreVersion.value = v).catch(() => {});
+  getConfigFileInfo().then(i => configFileInfo.value = i).catch(() => {});
 }
 function updateGeoData() {
   show(t("settings.checkingUpdate"), "info");
@@ -50,7 +65,18 @@ function openTrafficTunnel() {
 
 // ---- Right column - Basic ----
 function openStartupScript() {
-  show(t("settings.fileSelectorHint"), "info");
+  dialogOpen({
+    filters: [{ name: "Scripts", extensions: ["sh", "bat", "ps1", "js"] }],
+    multiple: false,
+    directory: false,
+  }).then(path => {
+    if (path) {
+      app.overrideScript = true;
+      app.overrideScriptContent = path;
+      startupScriptName.value = path.split("/").pop()?.split("\\").pop() || path;
+      show(t("common.success"), "success");
+    }
+  }).catch(() => show(t("common.error"), "error"));
 }
 function openThemeSettings() {
   openPanel("themeSettings");
@@ -73,10 +99,10 @@ function openCurrentConfig() {
   openPanel("currentConfig");
 }
 function openConfigDir() {
-  show(t("settings.fileSelectorHint"), "info");
+  openAppDir().catch(() => show(t("common.error"), "error"));
 }
 function openLogDir() {
-  show(t("settings.fileSelectorHint"), "info");
+  getLogDir().then(path => { try { open(path); } catch { show(t("common.error"), "error"); } }).catch(() => show(t("common.error"), "error"));
 }
 function checkUpdate() {
   show(t("settings.checkingUpdate"), "info");
@@ -92,26 +118,67 @@ function openLiteMode() {
   openPanel("liteMode");
 }
 function exitApp() {
-  show(t("settings.fileSelectorHint"), "info");
+  try { getCurrentWindow().close(); } catch { show(t("common.error"), "error"); }
 }
 function exportDiagnostics() {
-  show(t("settings.fileSelectorHint"), "info");
+  isExporting.value = true;
+  save({
+    filters: [{ name: "Diagnostics", extensions: ["json"] }],
+    defaultPath: `ns-vpn-diagnostics-${new Date().toISOString().split("T")[0]}.json`,
+  }).then(async path => {
+    if (!path) { isExporting.value = false; return; }
+    try {
+      const diag = await tauriExportDiagnostics();
+      await writeTextFile(path, JSON.stringify(diag, null, 2));
+      show(t("common.success"), "success");
+    } catch { show(t("common.error"), "error"); }
+    isExporting.value = false;
+  }).catch(() => { isExporting.value = false; show(t("common.error"), "error"); });
 }
 
 // ---- Backup actions ----
 function backupConfig() {
-  show(t("settings.fileSelectorHint"), "info");
+  save({
+    filters: [{ name: "YAML", extensions: ["yaml"] }],
+    defaultPath: "ns-vpn-config-backup.yaml",
+  }).then(async path => {
+    if (!path) return;
+    try {
+      const info = await getConfigFileInfo();
+      const content = await readTextFile(info.path);
+      await writeTextFile(path, content);
+      show(t("common.success"), "success");
+    } catch { show(t("common.error"), "error"); }
+  }).catch(() => show(t("common.error"), "error"));
 }
 function restoreConfig() {
-  show(t("settings.fileSelectorHint"), "info");
+  dialogOpen({
+    filters: [{ name: "YAML", extensions: ["yaml", "yml"] }],
+    multiple: false,
+  }).then(async path => {
+    if (!path) return;
+    try {
+      const content = await readTextFile(path);
+      const info = await getConfigFileInfo();
+      await writeTextFile(info.path, content);
+      show(t("common.success"), "success");
+    } catch { show(t("common.error"), "error"); }
+  }).catch(() => show(t("common.error"), "error"));
 }
 
 // ---- Current config actions ----
 function openConfigFile() {
-  show(t("settings.fileSelectorHint"), "info");
+  if (configFileInfo.value) {
+    open(configFileInfo.value.path).catch(() => show(t("common.error"), "error"));
+  }
 }
 function copyConfigPath() {
-  show(t("settings.fileSelectorHint"), "info");
+  if (configFileInfo.value) {
+    navigator.clipboard.writeText(configFileInfo.value.path).then(
+      () => show(t("common.success"), "success"),
+      () => show(t("common.error"), "error"),
+    );
+  }
 }
 
 const accentColors = ["#4f8ef7", "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e", "#f97316", "#22c55e", "#06b6d4", "#3b82f6"];
@@ -484,16 +551,16 @@ const panelTitle = computed(() => {
               <div class="modal-field">
                 <label class="modal-label">{{ t('home.coreInfo.coreVersion') }}</label>
                 <div class="modal-row">
-                  <input class="modal-input" value="v0.19.0" readonly />
+                  <input class="modal-input" :value="coreVersion || t('common.loading')" readonly />
                 </div>
               </div>
               <div class="modal-field">
-                <label class="modal-label">{{ t('home.coreInfo.uptime') }}</label>
-                <span class="modal-text">12h 34m</span>
+                <label class="modal-label">{{ t('home.coreInfo.rulesCount') }}</label>
+                <span class="modal-text">{{ app.rulesCount || 0 }}</span>
               </div>
               <div class="modal-field">
-                <label class="modal-label">{{ t('home.coreInfo.rulesCount') }}</label>
-                <span class="modal-text">3,284</span>
+                <label class="modal-label">{{ t('home.coreInfo.activeConnections') }}</label>
+                <span class="modal-text">{{ app.traffic.active_connections }}</span>
               </div>
             </template>
 
@@ -636,15 +703,15 @@ const panelTitle = computed(() => {
             <template v-if="activePanel === 'currentConfig'">
               <div class="modal-field">
                 <label class="modal-label">{{ t('settings.configName') }}</label>
-                <span class="modal-text">default.yaml</span>
+                <span class="modal-text">{{ configFileInfo?.path?.split('/')?.pop()?.split('\\')?.pop() || 'config.yaml' }}</span>
               </div>
               <div class="modal-field">
                 <label class="modal-label">{{ t('settings.configSize') }}</label>
-                <span class="modal-text">12.4 KB</span>
+                <span class="modal-text">{{ configFileInfo ? (configFileInfo.size / 1024).toFixed(1) + ' KB' : t('common.loading') }}</span>
               </div>
               <div class="modal-field">
                 <label class="modal-label">{{ t('settings.configModified') }}</label>
-                <span class="modal-text">2026-07-28 10:30</span>
+                <span class="modal-text">{{ configFileInfo?.modified || t('common.loading') }}</span>
               </div>
               <div class="modal-actions">
                 <button class="modal-btn primary" @click="openConfigFile">

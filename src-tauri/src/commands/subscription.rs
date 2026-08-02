@@ -1061,6 +1061,34 @@ pub fn convert_content(content: String, format: String) -> Result<String, String
     }
 }
 
+#[tauri::command]
+pub fn validate_content(content: String, format: String) -> Result<String, String> {
+    match format.as_str() {
+        "clash" | "yaml" => {
+            let v: serde_yaml_ng::Value = serde_yaml_ng::from_str(&content)
+                .map_err(|e| format!("YAML parse failed: {}", e))?;
+            if v.get("proxies").is_none() {
+                return Err("Missing required field: proxies".into());
+            }
+            if let Some(proxies) = v.get("proxies").and_then(|p| p.as_sequence()) {
+                if proxies.is_empty() {
+                    return Err("proxies list is empty".into());
+                }
+            }
+            Ok(content)
+        }
+        "v2rayn" => {
+            convert_v2rayn_to_clash(&content)?;
+            Ok(content)
+        }
+        "singbox" => {
+            convert_singbox_to_clash(&content)?;
+            Ok(content)
+        }
+        _ => Err(format!("Unsupported format: {}", format)),
+    }
+}
+
 #[cfg(test)]
 mod temp_wco_tests {
     use super::*;

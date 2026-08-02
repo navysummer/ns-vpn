@@ -148,7 +148,7 @@ pub fn run() {
             commands::system::get_version,
             commands::system::get_system_info,
             commands::system::open_app_dir,
-            commands::system::select_config_file,
+            commands::system::get_config_file_info, commands::system::get_log_dir, commands::system::export_diagnostics,
             commands::system::fetch_ip_info,
             commands::traffic::get_traffic,
             commands::logs::get_logs,
@@ -163,6 +163,7 @@ pub fn run() {
             commands::subscription::apply_subscription,
             commands::subscription::fetch_subscription_url,
             commands::subscription::convert_content,
+            commands::subscription::validate_content,
             commands::subscription::write_config_only,
         ])
         .run(tauri::generate_context!())

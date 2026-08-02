@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { watch, onMounted } from "vue";
+import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/app";
 import Sidebar from "@/components/Sidebar.vue";
 import ToastContainer from "@/components/ToastContainer.vue";
@@ -7,8 +8,10 @@ import ScrollToTop from "@/components/ScrollToTop.vue";
 import CoreInstallOverlay from "@/components/CoreInstallOverlay.vue";
 import { checkCoreInstalled, installCoreWithProgress, autoStartCore, writeConfigOnly, fetchSubscriptionUrl, convertContent } from "@/utils/tauri";
 import { isEnabled as autostartIsEnabled } from "@tauri-apps/plugin-autostart";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 const app = useAppStore();
+const router = useRouter();
 
 const bgThemes: Record<string, { dark: Record<string, string>; light: Record<string, string> }> = {
   default: {
@@ -144,6 +147,26 @@ onMounted(async () => {
     }
   } catch {
     // auto-start failed, ignore
+  }
+
+  // SilentStart: hide window when silent start is enabled
+  try {
+    if (app.silentStart) {
+      await getCurrentWindow().hide();
+    }
+  } catch {
+    // not in Tauri or error
+  }
+
+  // StartupPage: navigate to saved page
+  const pageMap: Record<string, string> = {
+    dashboard: "/dashboard",
+    proxies: "/proxies",
+    settings: "/settings",
+  };
+  const target = pageMap[app.startupPage] || "/dashboard";
+  if (router.currentRoute.value.path === "/") {
+    router.replace(target);
   }
 });
 </script>

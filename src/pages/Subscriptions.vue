@@ -7,7 +7,7 @@ import { useAppStore } from "@/stores/app";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import ContextMenu from "@/components/ContextMenu.vue";
 import QrViewer from "@/components/QrViewer.vue";
-import { writeConfigOnly, fetchSubscriptionUrl, openAppDir, convertContent } from "@/utils/tauri";
+import { writeConfigOnly, fetchSubscriptionUrl, openAppDir, convertContent, validateContent } from "@/utils/tauri";
 
 const { show } = useToast();
 const { t } = useI18n();
@@ -199,6 +199,14 @@ function clearFile() {
   if (fileInput.value) fileInput.value.value = "";
 }
 
+async function validateContentFormat(content: string, format: string): Promise<string | null> {
+  try {
+    return await validateContent(content, format);
+  } catch (e: any) {
+    return null;
+  }
+}
+
 async function doCreate() {
   if (!newName.value.trim()) {
     show(t("profiles.enterName"), "error");
@@ -221,6 +229,11 @@ let rawContent: string | undefined;
   if (newType.value === "local" && newFileContent.value) {
     rawContent = newFileContent.value;
     if (newFormat.value === "clash") {
+      const valid = await validateContentFormat(rawContent, "clash");
+      if (!valid) {
+        show(t("subscriptions.invalidFormat"), "error");
+        return;
+      }
       fileContent = rawContent;
     } else {
       try {
@@ -233,6 +246,11 @@ let rawContent: string | undefined;
   } else if (newType.value === "script" && newPasteContent.value) {
     rawContent = newPasteContent.value;
     if (newFormat.value === "clash") {
+      const valid = await validateContentFormat(rawContent, "clash");
+      if (!valid) {
+        show(t("subscriptions.invalidFormat"), "error");
+        return;
+      }
       fileContent = rawContent;
     } else {
       try {
@@ -410,11 +428,22 @@ function openEditDialog(sub: Subscription) {
   showEditDialog.value = true;
 }
 
-function doEdit() {
+async function doEdit() {
   if (!editTarget.value) return;
   if (!editName.value.trim()) {
     show(t("profiles.enterName"), "error");
     return;
+  }
+  if (editTarget.value.type === "remote" && editUrl.value.trim() && !editUrl.value.trim().match(/^https?:\/\/.+/)) {
+    show(t("subscriptions.invalidUrl"), "error");
+    return;
+  }
+  if (editFormat.value !== editTarget.value.format && editTarget.value.fileContent) {
+    const valid = await validateContentFormat(editTarget.value.fileContent, editFormat.value);
+    if (!valid) {
+      show(t("subscriptions.invalidFormat"), "error");
+      return;
+    }
   }
   editTarget.value.name = editName.value.trim();
   editTarget.value.description = editDescription.value.trim();
@@ -448,6 +477,11 @@ async function doEditFile() {
   if (!editTarget.value) return;
   const isClash = editTarget.value.format === "clash";
   if (isClash) {
+    const valid = await validateContentFormat(editFileContent.value, "clash");
+    if (!valid) {
+      show(t("subscriptions.invalidFormat"), "error");
+      return;
+    }
     editTarget.value.fileContent = editFileContent.value;
     editTarget.value.rawContent = undefined;
   } else {
@@ -744,6 +778,11 @@ async function saveSection(sub: Subscription, section: string, value: string) {
   const newContent = lines.join("\n");
   const isClash = sub.format === "clash";
   if (isClash) {
+    const valid = await validateContentFormat(newContent, "clash");
+    if (!valid) {
+      show(t("subscriptions.invalidFormat"), "error");
+      return;
+    }
     sub.fileContent = newContent;
     sub.rawContent = undefined;
   } else {

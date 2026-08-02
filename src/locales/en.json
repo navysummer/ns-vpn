@@ -183,6 +183,8 @@
     "confirmDeleteMsg": "Delete subscription \"{name}\"?",
     "justNow": "just now",
     "enterSubUrl": "Enter subscription URL",
+    "invalidUrl": "Please enter a valid URL (starting with http:// or https://)",
+    "invalidFormat": "Data format does not meet standards, please check and retry",
     "importSuccess": "Import successful",
     "createSub": "Create subscription",
     "createTitle": "New Profile",

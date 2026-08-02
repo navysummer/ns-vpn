@@ -222,5 +222,29 @@ export const fetchSubscriptionUrl = (url: string) =>
   tauriInvoke<string>("fetch_subscription_url", { url });
 export const convertContent = (content: string, format: string) =>
   tauriInvoke<string>("convert_content", { content, format });
+export const validateContent = (content: string, format: string) =>
+  tauriInvoke<string>("validate_content", { content, format });
 export const writeConfigOnly = (content: string) =>
   tauriInvoke("write_config_only", { content });
+
+export const getConfigFileInfo = () => tauriInvoke<ConfigFileInfo>("get_config_file_info");
+export const getLogDir = () => tauriInvoke<string>("get_log_dir");
+export const exportDiagnostics = () => tauriInvoke<DiagnosticsData>("export_diagnostics");
+
+export interface ConfigFileInfo {
+  path: string;
+  size: number;
+  modified: string;
+}
+
+export interface DiagnosticsData {
+  app_version: string;
+  os: string;
+  arch: string;
+  core_version: string | null;
+  config_file: ConfigFileInfo | null;
+  proxy_running: boolean;
+  rules_count: number;
+  connections_count: number;
+  memory: number;
+}

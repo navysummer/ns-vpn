@@ -183,6 +183,8 @@
     "confirmDeleteMsg": "确定要删除订阅「{name}」吗？",
     "justNow": "刚刚",
     "enterSubUrl": "请输入订阅链接",
+    "invalidUrl": "请输入有效的URL（以http://或https://开头）",
+    "invalidFormat": "数据格式不符合标准，请检查后重试",
     "importSuccess": "导入成功",
     "createSub": "新建订阅",
     "createTitle": "新建配置",
