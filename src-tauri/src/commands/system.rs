@@ -118,6 +118,16 @@ pub fn get_log_dir() -> Result<String, String> {
     Ok(log_dir.to_string_lossy().to_string())
 }
 
+#[tauri::command]
+pub fn open_log_dir() -> Result<(), String> {
+    let log_dir = dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("ns-vpn")
+        .join("logs");
+    std::fs::create_dir_all(&log_dir).map_err(|e| e.to_string())?;
+    opener::open(log_dir).map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Serialize)]
 pub struct DiagnosticsData {
     pub app_version: String,

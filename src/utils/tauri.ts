@@ -229,6 +229,7 @@ export const writeConfigOnly = (content: string) =>
 
 export const getConfigFileInfo = () => tauriInvoke<ConfigFileInfo>("get_config_file_info");
 export const getLogDir = () => tauriInvoke<string>("get_log_dir");
+export const openLogDir = () => tauriInvoke("open_log_dir");
 export const exportDiagnostics = () => tauriInvoke<DiagnosticsData>("export_diagnostics");
 
 export interface ConfigFileInfo {

@@ -431,6 +431,8 @@
     "trafficTunnelDesc": "配置流量隧道的转发方式",
     "accentColor": "主题色",
     "sidebarCompact": "侧边栏紧凑模式",
+    "adminMode": "管理员模式",
+    "disableQuic": "禁用 QUIC",
     "autoUpdate": "自动更新",
     "checkUpdateFreq": "检查更新频率",
     "freqDaily": "每天",

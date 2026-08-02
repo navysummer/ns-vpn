@@ -1,6 +1,6 @@
 [package]
 name = "ns-vpn"
-version = "1.0.0"
+version = "0.0.1"
 description = "NS VPN - A modern proxy GUI client based on Tauri + Vue"
 authors = ["you"]
 license = "GPL-3.0-only"

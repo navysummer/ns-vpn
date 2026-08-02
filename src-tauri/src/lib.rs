@@ -148,7 +148,7 @@ pub fn run() {
             commands::system::get_version,
             commands::system::get_system_info,
             commands::system::open_app_dir,
-            commands::system::get_config_file_info, commands::system::get_log_dir, commands::system::export_diagnostics,
+            commands::system::get_config_file_info, commands::system::get_log_dir, commands::system::open_log_dir, commands::system::export_diagnostics,
             commands::system::fetch_ip_info,
             commands::traffic::get_traffic,
             commands::logs::get_logs,

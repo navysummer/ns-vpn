@@ -5,7 +5,7 @@ import { useAppStore } from "@/stores/app";
 import { useToast } from "@/utils/toast";
 import { useI18n } from "vue-i18n";
 import { enable as autostartEnable, disable as autostartDisable } from "@tauri-apps/plugin-autostart";
-import { getCoreVersion, openAppDir, getConfigFileInfo, getLogDir, exportDiagnostics as tauriExportDiagnostics, type ConfigFileInfo } from "@/utils/tauri";
+import { getCoreVersion, openAppDir, getConfigFileInfo, getLogDir, openLogDir as tauriOpenLogDir, getVersion, exportDiagnostics as tauriExportDiagnostics, type ConfigFileInfo } from "@/utils/tauri";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-shell";
 import { save, open as dialogOpen } from "@tauri-apps/plugin-dialog";
@@ -24,6 +24,11 @@ const systemInfo = ref<{ version: string; os: string; arch: string; core_version
 const isCheckingUpdate = ref(false);
 const isExporting = ref(false);
 const startupScriptName = ref("");
+const appVersion = ref("");
+
+onMounted(() => {
+  getVersion().then(v => appVersion.value = v).catch(() => appVersion.value = "0.0.1");
+});
 
 watch(() => app.startAtBoot, async (val) => {
   try {
@@ -102,7 +107,7 @@ function openConfigDir() {
   openAppDir().catch(() => show(t("common.error"), "error"));
 }
 function openLogDir() {
-  getLogDir().then(path => { try { open(path); } catch { show(t("common.error"), "error"); } }).catch(() => show(t("common.error"), "error"));
+  tauriOpenLogDir().catch(() => show(t("common.error"), "error"));
 }
 function checkUpdate() {
   show(t("settings.checkingUpdate"), "info");
@@ -473,22 +478,10 @@ const panelTitle = computed(() => {
             </div>
             <ChevronRight :size="16" class="setting-arrow" />
           </div>
-          <div class="setting-row setting-row-link" @click="openDevTools">
-            <div class="setting-left">
-              <span class="setting-label">{{ t('settings.devTools') }}</span>
-            </div>
-            <ChevronRight :size="16" class="setting-arrow" />
-          </div>
           <div class="setting-row setting-row-link" @click="openLiteMode">
             <div class="setting-left">
               <span class="setting-label">{{ t('settings.liteMode') }}</span>
               <span class="setting-icon-btn">ℹ</span>
-            </div>
-            <ChevronRight :size="16" class="setting-arrow" />
-          </div>
-          <div class="setting-row setting-row-link" @click="exitApp">
-            <div class="setting-left">
-              <span class="setting-label">{{ t('settings.exit') }}</span>
             </div>
             <ChevronRight :size="16" class="setting-arrow" />
           </div>
@@ -504,7 +497,7 @@ const panelTitle = computed(() => {
               <span class="setting-label">{{ t('settings.nsvpnVersion') }}</span>
               <span class="setting-icon">📋</span>
             </div>
-            <span class="setting-value mono">v2.4.3</span>
+            <span class="setting-value mono">v{{ appVersion || '0.0.1' }}</span>
           </div>
         </div>
       </div>
@@ -554,14 +547,6 @@ const panelTitle = computed(() => {
                   <input class="modal-input" :value="coreVersion || t('common.loading')" readonly />
                 </div>
               </div>
-              <div class="modal-field">
-                <label class="modal-label">{{ t('home.coreInfo.rulesCount') }}</label>
-                <span class="modal-text">{{ app.rulesCount || 0 }}</span>
-              </div>
-              <div class="modal-field">
-                <label class="modal-label">{{ t('home.coreInfo.activeConnections') }}</label>
-                <span class="modal-text">{{ app.traffic.active_connections }}</span>
-              </div>
             </template>
 
             <!-- Traffic Tunnel -->
@@ -570,7 +555,7 @@ const panelTitle = computed(() => {
               <div class="modal-field">
                 <label class="modal-label">{{ t('settings.trafficTunnel') }}</label>
                 <select class="modal-select">
-                  <option value="system">{{ t('settings.systemProxy') }}</option>
+                  <option value="system">{{ t('home.networkSettings.systemProxy') }}</option>
                   <option value="tun">{{ t('home.networkSettings.tunMode') }}</option>
                 </select>
               </div>
