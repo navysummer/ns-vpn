@@ -41,7 +41,9 @@ dirs = "6"
 base64 = "0.22"
 flate2 = "1"
 meow-app = { version = "0.19", default-features = false, features = [
-  "full",
+  "ss", "trojan", "vless", "vless-vision", "vless-encryption", "vmess",
+  "snell", "hysteria2", "ech-tls-tunnel", "dns-server", "dns-encrypted",
+  "listener-http", "listener-socks5", "listener-tproxy", "listener-mixed",
 ] }
 meow-config = { version = "0.19", default-features = false, features = [
   "ss", "trojan", "vmess", "vless", "vless-vision", "vless-encryption",
