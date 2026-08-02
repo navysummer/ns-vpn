@@ -431,6 +431,8 @@ jobs:
     needs: [macos, macos-universal, windows, linux, ios, android]
     runs-on: ubuntu-22.04
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -460,4 +462,3 @@ jobs:
             artifacts/**/*
           draft: true
           prerelease: false
-          generate_release_notes: true
