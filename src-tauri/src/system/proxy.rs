@@ -1,6 +1,7 @@
 /// Local system proxy implementation
 /// Uses platform-specific shell commands instead of external crates
 
+#[cfg(any(target_os = "macos", target_os = "windows", target_os = "linux"))]
 use std::process::Command;
 
 /// Set system proxy (HTTP/HTTPS)

@@ -114,6 +114,7 @@ pub fn run() {
         core_manager: CoreManager::new(),
     };
 
+    #[cfg_attr(not(desktop), allow(unused_mut))]
     let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
